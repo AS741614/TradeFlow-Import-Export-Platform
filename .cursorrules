@@ -28,4 +28,5 @@ Run the following sequence in order before declaring task completion:
 
 ## 🎯 Scope Discipline & Pointers
 - Only edit files listed in the "Allowed Files" allowlist. No unrelated drive-by edits.
+- Never delete implementation_plan*.md / walkthrough*.md / task*.md. Move to docs/history/ instead. No rm in repo root.
 - *Full specifications in [AGENTS.md](file:///AGENTS.md) / [CLAUDE.md](file:///CLAUDE.md). Test rules in [TESTING.md](file:///TESTING.md).*

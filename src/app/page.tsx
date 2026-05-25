@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { getItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState } from 'react';
+import { getItems, setItems, STORAGE_KEYS } from '@/lib/storage';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { getSampleProducts, getSampleContacts, getDefaultTasks } from '@/lib/constants';
-import { addItem } from '@/lib/storage';
 import type { Product, Contact, Task, Shipment, Invoice, Campaign } from '@/lib/types';
 
 interface MetricData {
@@ -29,30 +28,26 @@ function MetricIcon({ name }: { name: string }) {
 }
 
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<MetricData[]>([]);
-  const [urgentTasks, setUrgentTasks] = useState<Task[]>([]);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+  const [metrics] = useState<MetricData[]>(() => {
     // Seed data on first load if empty
     let products = getItems<Product>(STORAGE_KEYS.PRODUCTS);
     if (products.length === 0) {
       const samples = getSampleProducts();
-      samples.forEach(p => addItem(STORAGE_KEYS.PRODUCTS, p));
+      setItems(STORAGE_KEYS.PRODUCTS, samples);
       products = samples;
     }
 
     let contacts = getItems<Contact>(STORAGE_KEYS.CONTACTS);
     if (contacts.length === 0) {
       const samples = getSampleContacts();
-      samples.forEach(c => addItem(STORAGE_KEYS.CONTACTS, c));
+      setItems(STORAGE_KEYS.CONTACTS, samples);
       contacts = samples;
     }
 
     let tasks = getItems<Task>(STORAGE_KEYS.TASKS);
     if (tasks.length === 0) {
       const defaults = getDefaultTasks();
-      defaults.forEach(t => addItem(STORAGE_KEYS.TASKS, t));
+      setItems(STORAGE_KEYS.TASKS, defaults);
       tasks = defaults;
     }
 
@@ -66,7 +61,7 @@ export default function DashboardPage() {
     const completedTasks = tasks.filter(t => t.status === 'done').length;
     const totalEmailsSent = campaigns.reduce((sum, c) => sum + c.stats.sent, 0);
 
-    const nextMetrics: MetricData[] = [
+    return [
       { label: 'Total Products', value: formatNumber(products.length), color: 'blue', icon: <MetricIcon name="products" /> },
       { label: 'Active Shipments', value: formatNumber(activeShipments), color: 'cyan', icon: <MetricIcon name="shipments" /> },
       { label: 'Pending Invoices', value: formatNumber(pendingInvoices), color: 'amber', icon: <MetricIcon name="invoices" /> },
@@ -76,23 +71,14 @@ export default function DashboardPage() {
       { label: 'Emails Sent', value: formatNumber(totalEmailsSent), color: 'blue', icon: <MetricIcon name="email" /> },
       { label: 'Revenue (Est.)', value: formatCurrency(0), color: 'emerald', icon: <MetricIcon name="revenue" /> },
     ];
+  });
 
-    const urgentList = tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5);
+  const [urgentTasks] = useState<Task[]>(() => {
+    const tasks = getItems<Task>(STORAGE_KEYS.TASKS);
+    return tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5);
+  });
 
-    setTimeout(() => {
-      setMetrics(nextMetrics);
-      setUrgentTasks(urgentList);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading dashboard...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="animate-fade-in">

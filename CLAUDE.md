@@ -92,6 +92,7 @@ If any step fails, the task is incomplete. Resolve the failure and restart the v
 - **Boundary Restriction**: Modify ONLY files listed in the task description's "Allowed Files" section.
 - **Escalation**: If a task requires editing a file outside the allowed list, you must STOP and request explicit permission.
 - **Refactoring Restrictions**: No unrelated "drive-by" code refactoring. Target edits precisely to preserve git diff histories.
+- **Audit-trail file preservation**: NEVER `rm` or delete files matching `implementation_plan*.md`, `walkthrough*.md`, or `task*.md` from the repository root. These document the partnership decision history. Before any cleanup or `rm` operation, check filenames against this pattern. If a plan file appears stale, MOVE it to `docs/history/` rather than deleting. Cleanup commands like `rm -f *.md` are forbidden in the repo root regardless of glob.
 
 ---
 

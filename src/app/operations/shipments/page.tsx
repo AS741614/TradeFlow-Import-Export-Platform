@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { COUNTRIES, CARRIERS } from '@/lib/constants';
@@ -21,27 +21,16 @@ const EMPTY_FORM = {
 };
 
 export default function ShipmentsPage() {
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>(() => getItems<Shipment>(STORAGE_KEYS.SHIPMENTS));
+  const [products] = useState<Product[]>(() => getItems<Product>(STORAGE_KEYS.PRODUCTS));
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
 
   // For adding products to the shipment
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedProductQty, setSelectedProductQty] = useState(1);
-
-  useEffect(() => {
-    const loadedShipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
-    const loadedProducts = getItems<Product>(STORAGE_KEYS.PRODUCTS);
-    setTimeout(() => {
-      setShipments(loadedShipments);
-      setProducts(loadedProducts);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   const filtered = shipments.filter((s) => {
     const q = search.toLowerCase();
@@ -154,13 +143,7 @@ export default function ShipmentsPage() {
     updateField('products', updatedProducts);
   };
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading shipments...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

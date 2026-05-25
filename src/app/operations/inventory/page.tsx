@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatCurrency, getStatusColor, nowISO } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, COUNTRIES, CURRENCIES } from '@/lib/constants';
@@ -30,21 +30,11 @@ const EMPTY_FORM: Omit<Product, 'id' | 'status' | 'createdAt' | 'updatedAt'> = {
 // ---- Component ----
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => getItems<Product>(STORAGE_KEYS.PRODUCTS));
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
-
-  // Load data from localStorage
-  useEffect(() => {
-    const data = getItems<Product>(STORAGE_KEYS.PRODUCTS);
-    setTimeout(() => {
-      setProducts(data);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   // Filtered products based on search
   const filtered = products.filter((p) => {
@@ -128,13 +118,7 @@ export default function InventoryPage() {
     []
   );
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading inventory...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

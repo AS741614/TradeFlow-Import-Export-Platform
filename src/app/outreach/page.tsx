@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getItems, STORAGE_KEYS } from '@/lib/storage';
 import { formatNumber, formatDate, getStatusColor, titleCase } from '@/lib/utils';
 import type { OutreachContact, EmailTemplate, Campaign } from '@/lib/types';
@@ -85,11 +85,7 @@ interface QuickAction {
 }
 
 export default function OutreachDashboardPage() {
-  const [metrics, setMetrics] = useState<MetricData[]>([]);
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+  const [metrics] = useState<MetricData[]>(() => {
     const contacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
     const templates = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
     const allCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
@@ -99,7 +95,7 @@ export default function OutreachDashboardPage() {
     );
     const totalSent = allCampaigns.reduce((sum, c) => sum + c.stats.sent, 0);
 
-    const nextMetrics: MetricData[] = [
+    return [
       {
         label: 'Total Contacts',
         value: formatNumber(contacts.length),
@@ -125,15 +121,11 @@ export default function OutreachDashboardPage() {
         icon: <EmailIcon />,
       },
     ];
-
-    const sortedCampaigns = allCampaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-    setTimeout(() => {
-      setMetrics(nextMetrics);
-      setCampaigns(sortedCampaigns);
-      setInitialized(true);
-    }, 0);
-  }, []);
+  });
+  const [campaigns] = useState<Campaign[]>(() => {
+    const allCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
+    return allCampaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  });
 
   const quickActions: QuickAction[] = [
     {
@@ -166,13 +158,7 @@ export default function OutreachDashboardPage() {
     },
   ];
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading outreach dashboard...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

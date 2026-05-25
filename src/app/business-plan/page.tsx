@@ -1,63 +1,45 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getItems, setItems, STORAGE_KEYS, getValue, setValue } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { getDefaultBusinessPlan, getDefaultSwotItems } from '@/lib/constants';
 import type { BusinessPlanSection, SwotItem } from '@/lib/types';
 
 export default function BusinessPlanPage() {
-  const [sections, setSections] = useState<BusinessPlanSection[]>([]);
-  const [swotItems, setSwotItems] = useState<SwotItem[]>([]);
-  const [activeTab, setActiveTab] = useState<string>('');
-  const [lastSaved, setLastSaved] = useState<string>('');
-  const [initialized, setInitialized] = useState(false);
-
-  // New SWOT item inputs for each quadrant
-  const [newStrength, setNewStrength] = useState('');
-  const [newWeakness, setNewWeakness] = useState('');
-  const [newOpportunity, setNewOpportunity] = useState('');
-  const [newThreat, setNewThreat] = useState('');
-
-  useEffect(() => {
-    // 1. Load or seed Business Plan Sections
+  const [sections, setSections] = useState<BusinessPlanSection[]>(() => {
     let loadedSections = getItems<BusinessPlanSection>(STORAGE_KEYS.BUSINESS_PLAN);
     if (loadedSections.length === 0) {
       const defaults = getDefaultBusinessPlan();
       setItems(STORAGE_KEYS.BUSINESS_PLAN, defaults);
       loadedSections = defaults;
     }
-    const sortedSections = loadedSections.sort((a, b) => a.order - b.order);
-    let firstTabId = '';
-    if (sortedSections.length > 0) {
-      const firstSection = sortedSections[0];
-      if (firstSection) {
-        firstTabId = firstSection.id;
-      }
-    }
-
-    // 2. Load or seed SWOT Items
+    return loadedSections.sort((a, b) => a.order - b.order);
+  });
+  const [swotItems, setSwotItems] = useState<SwotItem[]>(() => {
     let loadedSwot = getItems<SwotItem>(STORAGE_KEYS.SWOT);
     if (loadedSwot.length === 0) {
       const defaults = getDefaultSwotItems();
       setItems(STORAGE_KEYS.SWOT, defaults);
       loadedSwot = defaults;
     }
+    return loadedSwot;
+  });
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    let loadedSections = getItems<BusinessPlanSection>(STORAGE_KEYS.BUSINESS_PLAN);
+    if (loadedSections.length === 0) {
+      loadedSections = getDefaultBusinessPlan();
+    }
+    const sorted = loadedSections.sort((a, b) => a.order - b.order);
+    return sorted[0]?.id ?? '';
+  });
+  const [lastSaved, setLastSaved] = useState<string>(() => getValue<string>('bp_last_saved', nowISO()));
 
-    // 3. Load last saved timestamp
-    const savedTime = getValue<string>('bp_last_saved', nowISO());
-
-    // Defer state updates to avoid synchronous cascading renders
-    setTimeout(() => {
-      setSections(sortedSections);
-      if (firstTabId) {
-        setActiveTab(firstTabId);
-      }
-      setSwotItems(loadedSwot);
-      setLastSaved(savedTime);
-      setInitialized(true);
-    }, 0);
-  }, []);
+  // New SWOT item inputs for each quadrant
+  const [newStrength, setNewStrength] = useState('');
+  const [newWeakness, setNewWeakness] = useState('');
+  const [newOpportunity, setNewOpportunity] = useState('');
+  const [newThreat, setNewThreat] = useState('');
 
   // Save sections helper
   const saveSections = (updatedSections: BusinessPlanSection[]) => {
@@ -104,13 +86,7 @@ export default function BusinessPlanPage() {
     saveSwot(updated);
   };
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading business plan...</p>
-      </div>
-    );
-  }
+
 
   const currentSection = sections.find((s) => s.id === activeTab);
 

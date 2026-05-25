@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { getItems, STORAGE_KEYS } from '@/lib/storage';
 import { formatCurrency } from '@/lib/utils';
@@ -29,34 +29,14 @@ function computeMetrics(
 }
 
 export default function FinanceOverviewPage() {
-  const [costItems, setCostItems] = useState<CostItem[]>([]);
-  const [metrics, setMetrics] = useState<FinanceMetrics>({
-    totalRevenue: 0,
-    totalExpenses: 0,
-    netProfit: 0,
-    avgMargin: 0,
-  });
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
+  const [costItems] = useState<CostItem[]>(() => getItems<CostItem>(STORAGE_KEYS.COST_ITEMS));
+  const [metrics] = useState<FinanceMetrics>(() => {
     const items = getItems<CostItem>(STORAGE_KEYS.COST_ITEMS);
     const projections = getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS);
-    const computed = computeMetrics(items, projections);
+    return computeMetrics(items, projections);
+  });
 
-    setTimeout(() => {
-      setCostItems(items);
-      setMetrics(computed);
-      setReady(true);
-    }, 0);
-  }, []);
 
-  if (!ready) {
-    return (
-      <div className="empty-state">
-        <p>Loading finance data…</p>
-      </div>
-    );
-  }
 
   const recentCostItems = costItems.slice(-8).reverse();
 

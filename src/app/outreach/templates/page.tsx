@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback } from 'react';
+import { getItems, addItem, updateItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, nowISO } from '@/lib/utils';
 import { EMAIL_TEMPLATE_PRESETS } from '@/lib/constants';
 import { extractVariables, renderTemplate } from '@/lib/templateEngine';
@@ -47,13 +47,7 @@ const SAMPLE_CUSTOM_VARS = {
 };
 
 export default function OutreachTemplatesPage() {
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+  const [templates, setTemplates] = useState<EmailTemplate[]>(() => {
     let stored = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
 
     // Seed preset templates on first load
@@ -73,15 +67,14 @@ export default function OutreachTemplatesPage() {
           updatedAt: nowISO(),
         };
       });
-      seeded.forEach((t) => addItem(STORAGE_KEYS.EMAIL_TEMPLATES, t));
+      setItems(STORAGE_KEYS.EMAIL_TEMPLATES, seeded);
       stored = seeded;
     }
-
-    setTimeout(() => {
-      setTemplates(stored);
-      setInitialized(true);
-    }, 0);
-  }, []);
+    return stored;
+  });
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const openAdd = useCallback(() => {
     setEditingId(null);
@@ -164,13 +157,7 @@ export default function OutreachTemplatesPage() {
     []
   );
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading email templates...</p>
-      </div>
-    );
-  }
+
 
   // Pre-render Subject and Body previews
   const previewSubject = renderTemplate(form.subject, SAMPLE_CONTACT, SAMPLE_CUSTOM_VARS);

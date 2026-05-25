@@ -1,42 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getItems, STORAGE_KEYS } from '@/lib/storage';
 import { formatNumber, calcPercentage } from '@/lib/utils';
 import type { Campaign } from '@/lib/types';
 
 export default function OutreachTrackingPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+  const [campaigns] = useState<Campaign[]>(() => getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS));
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>(() => {
     const stored = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-    let firstCampId = '';
-    if (stored.length > 0) {
-      const firstCamp = stored[0];
-      if (firstCamp) {
-        firstCampId = firstCamp.id;
-      }
-    }
-    setTimeout(() => {
-      setCampaigns(stored);
-      if (firstCampId) {
-        setSelectedCampaignId(firstCampId);
-      }
-      setInitialized(true);
-    }, 0);
-  }, []);
+    return stored[0]?.id ?? '';
+  });
 
   const activeCampaign = campaigns.find((c) => c.id === selectedCampaignId);
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading analytics...</p>
-      </div>
-    );
-  }
+
 
   // Funnel calculations based on selected campaign stats
   const stats = activeCampaign?.stats ?? {

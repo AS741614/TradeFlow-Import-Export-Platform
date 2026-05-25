@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, nowISO, isValidEmail } from '@/lib/utils';
 import { COUNTRIES } from '@/lib/constants';
@@ -18,10 +18,9 @@ const EMPTY_MANUAL_FORM = {
 };
 
 export default function OutreachContactsPage() {
-  const [contacts, setContacts] = useState<OutreachContact[]>([]);
+  const [contacts, setContacts] = useState<OutreachContact[]>(() => getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS));
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState('all');
-  const [initialized, setInitialized] = useState(false);
 
   // Selection states
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -46,14 +45,6 @@ export default function OutreachContactsPage() {
     phone: 4,
     country: 5,
   });
-
-  useEffect(() => {
-    const loadedContacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
-    setTimeout(() => {
-      setContacts(loadedContacts);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   // Filter contacts
   const filtered = contacts.filter((c) => {
@@ -247,13 +238,7 @@ export default function OutreachContactsPage() {
     }
   };
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading directory...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

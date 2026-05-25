@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getItems, setItems, STORAGE_KEYS } from '@/lib/storage';
 import { formatCurrency, generateId } from '@/lib/utils';
 import type { FinancialProjection } from '@/lib/types';
@@ -14,22 +14,13 @@ const MONTHS = [
 const currentYear = new Date().getFullYear();
 
 export default function ProjectionsPage() {
-  const [projections, setProjections] = useState<FinancialProjection[]>([]);
-  const [ready, setReady] = useState(false);
+  const [projections, setProjections] = useState<FinancialProjection[]>(() => getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS));
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formMonth, setFormMonth] = useState(`${MONTHS[0] ?? ''} ${String(currentYear)}`);
   const [formRevenue, setFormRevenue] = useState('');
   const [formExpenses, setFormExpenses] = useState('');
-
-  useEffect(() => {
-    const data = getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS);
-    setTimeout(() => {
-      setProjections(data);
-      setReady(true);
-    }, 0);
-  }, []);
 
   const persist = useCallback((items: FinancialProjection[]) => {
     setProjections(items);
@@ -101,13 +92,7 @@ export default function ProjectionsPage() {
     1, // avoid 0
   );
 
-  if (!ready) {
-    return (
-      <div className="empty-state">
-        <p>Loading projections…</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

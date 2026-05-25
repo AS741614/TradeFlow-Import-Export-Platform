@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, nowISO } from '@/lib/utils';
 import { runCampaignSimulation } from '@/lib/email';
@@ -17,28 +17,15 @@ const INITIAL_WIZARD = {
 };
 
 export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [contacts, setContacts] = useState<OutreachContact[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(() => getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS));
+  const [templates] = useState<EmailTemplate[]>(() => getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES));
+  const [contacts] = useState<OutreachContact[]>(() => getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS));
 
   // Wizard state
   const [showWizard, setShowWizard] = useState(false);
   const [wizard, setWizard] = useState(INITIAL_WIZARD);
   const [contactSearch, setContactSearch] = useState('');
   const [contactTagFilter, setContactTagFilter] = useState('all');
-
-  useEffect(() => {
-    const loadedCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-    const loadedTemplates = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
-    const loadedContacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
-    setTimeout(() => {
-      setCampaigns(loadedCampaigns);
-      setTemplates(loadedTemplates);
-      setContacts(loadedContacts);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   const openWizard = () => {
     if (templates.length === 0) {
@@ -163,13 +150,7 @@ export default function CampaignsPage() {
     }
   };
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading campaigns...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

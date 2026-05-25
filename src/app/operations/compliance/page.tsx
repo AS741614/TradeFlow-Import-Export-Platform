@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback } from 'react';
+import { getItems, addItem, updateItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatDate, getStatusColor, nowISO } from '@/lib/utils';
 import type { ComplianceItem, Shipment } from '@/lib/types';
 
@@ -25,15 +25,8 @@ const COMPLIANCE_DOC_TYPES = [
 ];
 
 export default function CompliancePage() {
-  const [complianceItems, setComplianceItems] = useState<ComplianceItem[]>([]);
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showModal, setShowModal] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
+  const [shipments] = useState<Shipment[]>(() => getItems<Shipment>(STORAGE_KEYS.SHIPMENTS));
+  const [complianceItems, setComplianceItems] = useState<ComplianceItem[]>(() => {
     let storedCompliance = getItems<ComplianceItem>(STORAGE_KEYS.COMPLIANCE);
     const storedShipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
 
@@ -67,16 +60,15 @@ export default function CompliancePage() {
         d1.shipmentId = s0.id;
       }
 
-      defaults.forEach((item) => addItem(STORAGE_KEYS.COMPLIANCE, item));
+      setItems(STORAGE_KEYS.COMPLIANCE, defaults);
       storedCompliance = defaults;
     }
-
-    setTimeout(() => {
-      setShipments(storedShipments);
-      setComplianceItems(storedCompliance);
-      setInitialized(true);
-    }, 0);
-  }, []);
+    return storedCompliance;
+  });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const openAdd = useCallback(() => {
     setEditingId(null);
@@ -152,13 +144,7 @@ export default function CompliancePage() {
     return item.status === statusFilter;
   });
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading compliance checklists...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

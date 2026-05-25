@@ -1,0 +1,32 @@
+# Task — Hydration Correction & Governance Pass
+
+- [x] 1. Restore generics in `src/lib/storage.ts`
+  - [x] Add `<T>` to `setItems` and `setValue`
+  - [x] Add `@typescript-eslint/no-unnecessary-type-parameters` disable comment
+  - [x] Verify `npx tsc --noEmit` and `npm run lint`
+- [x] 2. Hydration Fixes (Per-File Refactor)
+  - [x] src/app/finance/page.tsx
+  - [x] src/app/finance/projections/page.tsx
+  - [x] src/app/operations/compliance/page.tsx
+  - [x] src/app/operations/contacts/page.tsx
+  - [x] src/app/operations/inventory/page.tsx
+  - [x] src/app/operations/invoices/page.tsx
+  - [x] src/app/operations/shipments/page.tsx
+  - [x] src/app/outreach/campaigns/page.tsx
+  - [x] src/app/outreach/contacts/page.tsx
+  - [x] src/app/outreach/page.tsx
+  - [x] src/app/outreach/templates/page.tsx
+  - [x] src/app/outreach/tracking/page.tsx
+  - [x] src/app/page.tsx
+  - [x] src/app/projects/page.tsx
+  - [x] src/app/business-plan/page.tsx
+- [x] 3. Apply Governance patches
+  - [x] AGENTS.md
+  - [x] CLAUDE.md
+  - [x] .cursorrules
+  - [x] Run `diff AGENTS.md CLAUDE.md` (must be empty)
+- [x] 4. Final verification gate
+  - [x] Run `npx tsc --noEmit`
+  - [x] Run `npm run lint`
+  - [x] Run `npm run build`
+- [x] 5. Commit all changes

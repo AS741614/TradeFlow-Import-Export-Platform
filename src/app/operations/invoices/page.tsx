@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatCurrency, formatDate, getStatusColor, nowISO } from '@/lib/utils';
 import { CURRENCIES } from '@/lib/constants';
@@ -26,26 +26,15 @@ const EMPTY_FORM = {
 };
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>(() => getItems<Invoice>(STORAGE_KEYS.INVOICES));
+  const [contacts] = useState<Contact[]>(() => getItems<Contact>(STORAGE_KEYS.CONTACTS));
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
 
   // Line item adder in form
   const [tempItem, setTempItem] = useState(EMPTY_LINE_ITEM);
-
-  useEffect(() => {
-    const loadedInvoices = getItems<Invoice>(STORAGE_KEYS.INVOICES);
-    const loadedContacts = getItems<Contact>(STORAGE_KEYS.CONTACTS);
-    setTimeout(() => {
-      setInvoices(loadedInvoices);
-      setContacts(loadedContacts);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   const filtered = invoices.filter((inv) => {
     const q = search.toLowerCase();
@@ -168,13 +157,7 @@ export default function InvoicesPage() {
     setInvoices(updated);
   }, []);
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading invoices...</p>
-      </div>
-    );
-  }
+
 
   const { subtotal: activeSubtotal, tax: activeTax, total: activeTotal } = calculateTotals(form.lineItems, form.taxRate);
 

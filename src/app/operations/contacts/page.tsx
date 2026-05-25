@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, getStatusColor, nowISO } from '@/lib/utils';
 import { COUNTRIES, INCOTERMS } from '@/lib/constants';
@@ -20,22 +20,13 @@ const EMPTY_FORM = {
 };
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>(() => getItems<Contact>(STORAGE_KEYS.CONTACTS));
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    const data = getItems<Contact>(STORAGE_KEYS.CONTACTS);
-    setTimeout(() => {
-      setContacts(data);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   const filtered = contacts.filter((c) => {
     const q = search.toLowerCase();
@@ -117,13 +108,7 @@ export default function ContactsPage() {
     []
   );
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading directory...</p>
-      </div>
-    );
-  }
+
 
   return (
     <div className="animate-fade-in">

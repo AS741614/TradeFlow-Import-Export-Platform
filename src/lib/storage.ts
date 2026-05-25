@@ -31,7 +31,8 @@ export function getItemById<T extends { id: string }>(key: string, id: string): 
 /**
  * Save entire collection to localStorage.
  */
-export function setItems(key: string, items: unknown[]): void {
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+export function setItems<T>(key: string, items: T[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(items));
@@ -91,7 +92,8 @@ export function getValue<T>(key: string, defaultValue: T): T {
 /**
  * Set a single value (non-array) in localStorage.
  */
-export function setValue(key: string, value: unknown): void {
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+export function setValue<T>(key: string, value: T): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, type DragEvent, type SubmitEvent } from 'react';
+import { useState, useCallback, type DragEvent, type SubmitEvent } from 'react';
 import { getItems, addItem, setItems, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, nowISO, formatDate } from '@/lib/utils';
 import { getDefaultTasks } from '@/lib/constants';
@@ -92,27 +92,19 @@ const EMPTY_FORM: NewTaskForm = {
 // ============================================================
 
 export default function ProjectsPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    let stored = getItems<Task>(STORAGE_KEYS.TASKS);
+    if (stored.length === 0) {
+      const defaults = getDefaultTasks();
+      setItems(STORAGE_KEYS.TASKS, defaults);
+      stored = defaults;
+    }
+    return stored;
+  });
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewTaskForm>(EMPTY_FORM);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
-
-  // ---- Load / seed tasks ----
-
-  useEffect(() => {
-    let stored = getItems<Task>(STORAGE_KEYS.TASKS);
-    if (stored.length === 0) {
-      const defaults = getDefaultTasks();
-      defaults.forEach((t) => addItem(STORAGE_KEYS.TASKS, t));
-      stored = defaults;
-    }
-    setTimeout(() => {
-      setTasks(stored);
-      setInitialized(true);
-    }, 0);
-  }, []);
 
   // ---- Derived metrics ----
 
@@ -204,15 +196,7 @@ export default function ProjectsPage() {
     [form],
   );
 
-  // ---- Loading state ----
 
-  if (!initialized) {
-    return (
-      <div className="empty-state">
-        <p>Loading projects…</p>
-      </div>
-    );
-  }
 
   // ---- Render ----
 
