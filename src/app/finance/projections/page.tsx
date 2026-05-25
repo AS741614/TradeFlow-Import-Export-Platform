@@ -19,14 +19,16 @@ export default function ProjectionsPage() {
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formMonth, setFormMonth] = useState(`${MONTHS[0]} ${currentYear}`);
+  const [formMonth, setFormMonth] = useState(`${MONTHS[0] ?? ''} ${String(currentYear)}`);
   const [formRevenue, setFormRevenue] = useState('');
   const [formExpenses, setFormExpenses] = useState('');
 
   useEffect(() => {
     const data = getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS);
-    setProjections(data);
-    setReady(true);
+    setTimeout(() => {
+      setProjections(data);
+      setReady(true);
+    }, 0);
   }, []);
 
   const persist = useCallback((items: FinancialProjection[]) => {
@@ -36,7 +38,7 @@ export default function ProjectionsPage() {
 
   const resetForm = () => {
     setEditingId(null);
-    setFormMonth(`${MONTHS[0]} ${currentYear}`);
+    setFormMonth(`${MONTHS[0] ?? ''} ${String(currentYear)}`);
     setFormRevenue('');
     setFormExpenses('');
   };
@@ -191,12 +193,12 @@ export default function ProjectionsPage() {
               onChange={(e) => setFormMonth(e.target.value)}
             >
               {MONTHS.map((m) => (
-                <option key={m} value={`${m} ${currentYear}`}>
+                <option key={m} value={`${m} ${String(currentYear)}`}>
                   {m} {currentYear}
                 </option>
               ))}
               {MONTHS.map((m) => (
-                <option key={`${m}-next`} value={`${m} ${currentYear + 1}`}>
+                <option key={`${m}-next`} value={`${m} ${String(currentYear + 1)}`}>
                   {m} {currentYear + 1}
                 </option>
               ))}
@@ -259,7 +261,7 @@ export default function ProjectionsPage() {
               </tr>
             </thead>
             <tbody>
-              {projections.map((p, i) => (
+              {projections.map((p) => (
                 <tr key={p.id} className="stagger-item">
                   <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{p.month}</td>
                   <td style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(p.revenue)}</td>
@@ -335,7 +337,7 @@ export default function ProjectionsPage() {
 
           {/* Bars */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
-            {projections.map((p, i) => {
+            {projections.map((p) => {
               const revWidth = maxValue > 0 ? (p.revenue / maxValue) * 100 : 0;
               const expWidth = maxValue > 0 ? (p.expenses / maxValue) * 100 : 0;
               const profitWidth = maxValue > 0 ? (Math.abs(p.profit) / maxValue) * 100 : 0;
@@ -353,7 +355,7 @@ export default function ProjectionsPage() {
                       <div
                         style={{
                           height: 20,
-                          width: `${Math.max(revWidth, 2)}%`,
+                          width: `${String(Math.max(revWidth, 2))}%`,
                           background: 'var(--accent-emerald)',
                           borderRadius: 'var(--radius-sm)',
                           transition: 'width 500ms ease',
@@ -367,7 +369,7 @@ export default function ProjectionsPage() {
                       <div
                         style={{
                           height: 20,
-                          width: `${Math.max(expWidth, 2)}%`,
+                          width: `${String(Math.max(expWidth, 2))}%`,
                           background: 'var(--accent-red)',
                           borderRadius: 'var(--radius-sm)',
                           transition: 'width 500ms ease',
@@ -381,7 +383,7 @@ export default function ProjectionsPage() {
                       <div
                         style={{
                           height: 20,
-                          width: `${Math.max(profitWidth, 2)}%`,
+                          width: `${String(Math.max(profitWidth, 2))}%`,
                           background: p.profit >= 0 ? 'var(--accent-blue)' : 'var(--accent-amber)',
                           borderRadius: 'var(--radius-sm)',
                           transition: 'width 500ms ease',

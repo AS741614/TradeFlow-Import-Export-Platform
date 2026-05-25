@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, formatDate, getStatusColor, nowISO } from '@/lib/utils';
+import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { COUNTRIES, CARRIERS } from '@/lib/constants';
 import type { Shipment, ShipmentStatus, Product, ShipmentProduct } from '@/lib/types';
 
@@ -10,9 +10,9 @@ const STATUS_FLOW: ShipmentStatus[] = ['ordered', 'shipped', 'in-transit', 'cust
 
 const EMPTY_FORM = {
   reference: '',
-  origin: COUNTRIES[0],
-  destination: COUNTRIES[1],
-  carrier: CARRIERS[0],
+  origin: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  destination: COUNTRIES[1] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  carrier: CARRIERS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
   trackingNumber: '',
   estimatedArrival: '',
   status: 'ordered' as ShipmentStatus,
@@ -34,9 +34,13 @@ export default function ShipmentsPage() {
   const [selectedProductQty, setSelectedProductQty] = useState(1);
 
   useEffect(() => {
-    setShipments(getItems<Shipment>(STORAGE_KEYS.SHIPMENTS));
-    setProducts(getItems<Product>(STORAGE_KEYS.PRODUCTS));
-    setInitialized(true);
+    const loadedShipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
+    const loadedProducts = getItems<Product>(STORAGE_KEYS.PRODUCTS);
+    setTimeout(() => {
+      setShipments(loadedShipments);
+      setProducts(loadedProducts);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const filtered = shipments.filter((s) => {
@@ -46,7 +50,7 @@ export default function ShipmentsPage() {
       s.origin.toLowerCase().includes(q) ||
       s.destination.toLowerCase().includes(q) ||
       s.carrier.toLowerCase().includes(q) ||
-      (s.trackingNumber && s.trackingNumber.toLowerCase().includes(q))
+      (s.trackingNumber?.toLowerCase().includes(q))
     );
   });
 
@@ -65,11 +69,11 @@ export default function ShipmentsPage() {
       origin: shipment.origin,
       destination: shipment.destination,
       carrier: shipment.carrier,
-      trackingNumber: shipment.trackingNumber || '',
+      trackingNumber: shipment.trackingNumber ?? '',
       estimatedArrival: shipment.estimatedArrival,
       status: shipment.status,
-      notes: shipment.notes || '',
-      products: shipment.products || [],
+      notes: shipment.notes ?? '',
+      products: shipment.products,
     });
     setSelectedProductId('');
     setSelectedProductQty(1);
@@ -125,10 +129,13 @@ export default function ShipmentsPage() {
     if (!prod) return;
 
     const existingIndex = form.products.findIndex((p) => p.productId === selectedProductId);
-    let updatedProducts = [...form.products];
+    const updatedProducts = [...form.products];
 
     if (existingIndex !== -1) {
-      updatedProducts[existingIndex].quantity += selectedProductQty;
+      const targetProduct = updatedProducts[existingIndex];
+      if (targetProduct) {
+        targetProduct.quantity += selectedProductQty;
+      }
     } else {
       updatedProducts.push({
         productId: prod.id,
@@ -229,7 +236,7 @@ export default function ShipmentsPage() {
                     </div>
 
                     {/* Products summary inside card */}
-                    {shipment.products && shipment.products.length > 0 && (
+                    {shipment.products.length > 0 && (
                       <div style={{ marginTop: 'var(--space-md)', background: 'var(--bg-secondary)', padding: 'var(--space-sm) var(--space-md)', borderRadius: 'var(--radius-md)' }}>
                         <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>Cargo:</span>
                         <div style={{ display: 'flex', gap: 'var(--space-md)', flexWrap: 'wrap', marginTop: '4px' }}>

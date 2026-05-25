@@ -38,9 +38,13 @@ export default function InvoicesPage() {
   const [tempItem, setTempItem] = useState(EMPTY_LINE_ITEM);
 
   useEffect(() => {
-    setInvoices(getItems<Invoice>(STORAGE_KEYS.INVOICES));
-    setContacts(getItems<Contact>(STORAGE_KEYS.CONTACTS));
-    setInitialized(true);
+    const loadedInvoices = getItems<Invoice>(STORAGE_KEYS.INVOICES);
+    const loadedContacts = getItems<Contact>(STORAGE_KEYS.CONTACTS);
+    setTimeout(() => {
+      setInvoices(loadedInvoices);
+      setContacts(loadedContacts);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const filtered = invoices.filter((inv) => {
@@ -55,12 +59,12 @@ export default function InvoicesPage() {
   const openAdd = useCallback(() => {
     setEditingId(null);
     // Generate a default invoice number based on date and count
-    const num = `INV-${new Date().getFullYear()}-${(invoices.length + 1).toString().padStart(3, '0')}`;
+    const num = `INV-${String(new Date().getFullYear())}-${(invoices.length + 1).toString().padStart(3, '0')}`;
     setForm({
       ...EMPTY_FORM,
       number: num,
-      issuedDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days due
+      issuedDate: new Date().toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
     });
     setTempItem(EMPTY_LINE_ITEM);
     setShowModal(true);
@@ -72,13 +76,13 @@ export default function InvoicesPage() {
       number: invoice.number,
       contactId: invoice.contactId,
       contactName: invoice.contactName,
-      lineItems: invoice.lineItems || [],
+      lineItems: invoice.lineItems,
       currency: invoice.currency,
       taxRate: invoice.taxRate,
       status: invoice.status,
       issuedDate: invoice.issuedDate,
       dueDate: invoice.dueDate,
-      notes: invoice.notes || '',
+      notes: invoice.notes ?? '',
     });
     setTempItem(EMPTY_LINE_ITEM);
     setShowModal(true);

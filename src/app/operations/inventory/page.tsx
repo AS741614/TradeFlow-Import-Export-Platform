@@ -18,13 +18,13 @@ const EMPTY_FORM: Omit<Product, 'id' | 'status' | 'createdAt' | 'updatedAt'> = {
   name: '',
   sku: '',
   hsCode: '',
-  category: PRODUCT_CATEGORIES[0],
+  category: PRODUCT_CATEGORIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
   quantity: 0,
   reorderLevel: 10,
   unitCost: 0,
   currency: 'USD',
   supplier: '',
-  origin: COUNTRIES[0],
+  origin: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
 };
 
 // ---- Component ----
@@ -39,8 +39,11 @@ export default function InventoryPage() {
 
   // Load data from localStorage
   useEffect(() => {
-    setProducts(getItems<Product>(STORAGE_KEYS.PRODUCTS));
-    setInitialized(true);
+    const data = getItems<Product>(STORAGE_KEYS.PRODUCTS);
+    setTimeout(() => {
+      setProducts(data);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   // Filtered products based on search
@@ -179,7 +182,7 @@ export default function InventoryPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((product, i) => (
+              {filtered.map((product) => (
                 <tr key={product.id} className="stagger-item">
                   <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{product.name}</td>
                   <td><code style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{product.sku}</code></td>

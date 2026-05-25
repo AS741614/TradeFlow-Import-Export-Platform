@@ -6,16 +6,13 @@
  * Generate a unique ID using crypto.randomUUID with fallback.
  */
 export function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'id-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+  return crypto.randomUUID();
 }
 
 /**
  * Format a number as currency.
  */
-export function formatCurrency(amount: number, currency: string = 'USD'): string {
+export function formatCurrency(amount: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -68,10 +65,10 @@ export function getRelativeTime(dateStr: string): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  if (diffMins < 60) return `${String(diffMins)}m ago`;
+  if (diffHours < 24) return `${String(diffHours)}h ago`;
+  if (diffDays < 7) return `${String(diffDays)}d ago`;
+  if (diffDays < 30) return `${String(Math.floor(diffDays / 7))}w ago`;
   return formatDate(dateStr);
 }
 
@@ -173,7 +170,7 @@ export function getStatusColor(status: string): string {
     'paused': 'status-neutral',
     'inactive': 'status-neutral',
   };
-  return colorMap[status] || 'status-neutral';
+  return colorMap[status] ?? 'status-neutral';
 }
 
 /**

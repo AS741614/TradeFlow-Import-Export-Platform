@@ -3,10 +3,10 @@ import { runCampaignSimulation } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { campaignId } = body;
+    const body = (await request.json()) as Record<string, unknown>;
+    const campaignId = body.campaignId;
 
-    if (!campaignId) {
+    if (typeof campaignId !== 'string' || !campaignId) {
       return NextResponse.json({ error: 'Missing campaignId' }, { status: 400 });
     }
 
@@ -22,8 +22,9 @@ export async function POST(request: Request) {
       message: 'Campaign dispatched successfully',
       campaignId,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Email API Route Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

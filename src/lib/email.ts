@@ -3,9 +3,8 @@
 // ============================================================
 
 import { getItems, setItems, STORAGE_KEYS } from './storage';
-import { renderTemplate } from './templateEngine';
 import { nowISO } from './utils';
-import type { Campaign, OutreachContact, EmailTemplate } from './types';
+import type { Campaign, OutreachContact, EmailTemplate, EmailStatus } from './types';
 
 /**
  * Runs a campaign and simulates sending emails to all selected contacts.
@@ -17,6 +16,8 @@ export function runCampaignSimulation(campaignId: string): void {
   if (campaignIndex === -1) return;
 
   const campaign = campaigns[campaignIndex];
+  if (!campaign) return;
+
   const contacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
   const templates = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
 
@@ -28,15 +29,15 @@ export function runCampaignSimulation(campaignId: string): void {
   const total = campaignContacts.length;
 
   if (total === 0) {
-    campaigns[campaignIndex].status = 'completed';
-    campaigns[campaignIndex].updatedAt = nowISO();
+    campaign.status = 'completed';
+    campaign.updatedAt = nowISO();
     setItems(STORAGE_KEYS.CAMPAIGNS, campaigns);
     return;
   }
 
   // Update status to sending
-  campaigns[campaignIndex].status = 'sending';
-  campaigns[campaignIndex].updatedAt = nowISO();
+  campaign.status = 'sending';
+  campaign.updatedAt = nowISO();
   setItems(STORAGE_KEYS.CAMPAIGNS, campaigns);
 
   // We will simulate sending.
@@ -59,19 +60,22 @@ export function runCampaignSimulation(campaignId: string): void {
     const freshCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
     const idx = freshCampaigns.findIndex((c) => c.id === campaignId);
     if (idx !== -1) {
-      freshCampaigns[idx].status = 'completed';
-      freshCampaigns[idx].stats = {
-        total,
-        sent: total,
-        delivered: deliveredCount,
-        opened: openedCount,
-        clicked: clickedCount,
-        replied: repliedCount,
-        bounced: bouncedCount,
-        failed: failedCount,
-      };
-      freshCampaigns[idx].updatedAt = nowISO();
-      setItems(STORAGE_KEYS.CAMPAIGNS, freshCampaigns);
+      const freshCampaign = freshCampaigns[idx];
+      if (freshCampaign) {
+        freshCampaign.status = 'completed';
+        freshCampaign.stats = {
+          total,
+          sent: total,
+          delivered: deliveredCount,
+          opened: openedCount,
+          clicked: clickedCount,
+          replied: repliedCount,
+          bounced: bouncedCount,
+          failed: failedCount,
+        };
+        freshCampaign.updatedAt = nowISO();
+        setItems(STORAGE_KEYS.CAMPAIGNS, freshCampaigns);
+      }
     }
 
     // Update contacts' campaign histories
@@ -79,7 +83,7 @@ export function runCampaignSimulation(campaignId: string): void {
     const updatedContacts = freshContacts.map((contact) => {
       if (campaign.contactIds.includes(contact.id)) {
         // Determine status for this specific contact
-        let contactEmailStatus: any = 'sent';
+        let contactEmailStatus: EmailStatus = 'sent';
         const rand = Math.random();
         if (rand < 0.03) {
           contactEmailStatus = 'bounced';
@@ -93,7 +97,7 @@ export function runCampaignSimulation(campaignId: string): void {
           contactEmailStatus = 'delivered';
         }
 
-        const existingHistory = contact.campaignHistory || [];
+        const existingHistory = contact.campaignHistory;
         return {
           ...contact,
           lastContacted: nowISO(),

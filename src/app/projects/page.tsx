@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useState, useCallback, type DragEvent, type SubmitEvent } from 'react';
 import { getItems, addItem, setItems, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, nowISO, formatDate, getStatusColor } from '@/lib/utils';
+import { generateId, nowISO, formatDate } from '@/lib/utils';
 import { getDefaultTasks } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/types';
 
@@ -108,8 +108,10 @@ export default function ProjectsPage() {
       defaults.forEach((t) => addItem(STORAGE_KEYS.TASKS, t));
       stored = defaults;
     }
-    setTasks(stored);
-    setInitialized(true);
+    setTimeout(() => {
+      setTasks(stored);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   // ---- Derived metrics ----
@@ -172,7 +174,7 @@ export default function ProjectsPage() {
   // ---- Add task handler ----
 
   const handleAddTask = useCallback(
-    (e: FormEvent) => {
+    (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!form.title.trim()) return;
 
@@ -323,7 +325,7 @@ export default function ProjectsPage() {
               </div>
 
               {/* Task cards */}
-              {columnTasks.map((task, idx) => (
+              {columnTasks.map((task) => (
                 <div
                   key={task.id}
                   id={`kanban-card-${task.id}`}
@@ -415,7 +417,6 @@ export default function ProjectsPage() {
                     value={form.title}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                     required
-                    autoFocus
                   />
                 </div>
 

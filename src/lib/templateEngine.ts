@@ -11,7 +11,10 @@ export function extractVariables(text: string): string[] {
   const matches = text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g);
   const vars = new Set<string>();
   for (const match of matches) {
-    vars.add(match[1]);
+    const variableName = match[1];
+    if (variableName !== undefined) {
+      vars.add(variableName);
+    }
   }
   return Array.from(vars);
 }
@@ -33,7 +36,7 @@ export function renderTemplate(
     last_name: contact.lastName || '',
     email: contact.email || '',
     company: contact.company || 'your company',
-    phone: contact.phone || '',
+    phone: contact.phone ?? '',
     country: contact.country || 'your country',
     ...customVars,
   };
@@ -41,7 +44,7 @@ export function renderTemplate(
   // 2. Perform replacements
   Object.keys(map).forEach((key) => {
     const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
-    rendered = rendered.replace(regex, map[key] || '');
+    rendered = rendered.replace(regex, map[key] ?? '');
   });
 
   // 3. Fallback for any unmatched placeholders (removes them or leaves space)

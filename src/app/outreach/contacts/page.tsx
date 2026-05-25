@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { getItems, addItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, nowISO, isValidEmail, getStatusColor } from '@/lib/utils';
+import { useEffect, useState, useRef } from 'react';
+import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { generateId, nowISO, isValidEmail } from '@/lib/utils';
 import { COUNTRIES } from '@/lib/constants';
 import { parseCSV, mapParsedDataToContacts, parseJSONContacts } from '@/lib/importers';
-import type { OutreachContact, OutreachSource } from '@/lib/types';
+import type { OutreachContact } from '@/lib/types';
 
 const EMPTY_MANUAL_FORM = {
   firstName: '',
@@ -13,7 +13,7 @@ const EMPTY_MANUAL_FORM = {
   email: '',
   company: '',
   phone: '',
-  country: COUNTRIES[0],
+  country: COUNTRIES[0] ?? 'United States', // strict-ts-deferred: assert at constants source in later prompt
   tags: '',
 };
 
@@ -48,8 +48,11 @@ export default function OutreachContactsPage() {
   });
 
   useEffect(() => {
-    setContacts(getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS));
-    setInitialized(true);
+    const loadedContacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
+    setTimeout(() => {
+      setContacts(loadedContacts);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   // Filter contacts
@@ -68,7 +71,7 @@ export default function OutreachContactsPage() {
   });
 
   // Extract all unique tags
-  const allTags = Array.from(new Set(contacts.flatMap((c) => c.tags || [])));
+  const allTags = Array.from(new Set(contacts.flatMap((c) => c.tags)));
 
   // Drag handlers
   const handleDrag = (e: React.DragEvent) => {
@@ -101,7 +104,7 @@ export default function OutreachContactsPage() {
             }
           });
           setContacts(updated);
-          alert(`Successfully imported ${parsed.length} contacts from JSON!`);
+          alert(`Successfully imported ${String(parsed.length)} contacts from JSON!`);
         } else {
           alert('Could not parse any valid contacts from the JSON file.');
         }
@@ -115,6 +118,11 @@ export default function OutreachContactsPage() {
 
         const headers = rawCSV[0];
         const rows = rawCSV.slice(1);
+
+        if (!headers) {
+          alert('CSV file must contain a header row and at least one contact.');
+          return;
+        }
 
         setCsvHeaders(headers);
         setCsvRows(rows);
@@ -149,13 +157,13 @@ export default function OutreachContactsPage() {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (e.dataTransfer.files[0]) {
       processUploadedFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       processUploadedFile(e.target.files[0]);
     }
   };
@@ -171,7 +179,7 @@ export default function OutreachContactsPage() {
         }
       });
       setContacts(updated);
-      alert(`Imported ${imported.length} contacts!`);
+      alert(`Imported ${String(imported.length)} contacts!`);
     } else {
       alert('No contacts were imported. Please check your mapping columns and email validity.');
     }
@@ -229,7 +237,7 @@ export default function OutreachContactsPage() {
 
   const handleBulkDelete = () => {
     if (selectedIds.length === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.length} selected contacts?`)) {
+    if (confirm(`Are you sure you want to delete ${String(selectedIds.length)} selected contacts?`)) {
       let updated = [...contacts];
       selectedIds.forEach((id) => {
         updated = removeItem<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS, id);

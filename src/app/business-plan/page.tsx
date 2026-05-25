@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { getItems, setItems, STORAGE_KEYS, getValue, setValue } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { getDefaultBusinessPlan, getDefaultSwotItems } from '@/lib/constants';
@@ -27,9 +27,13 @@ export default function BusinessPlanPage() {
       setItems(STORAGE_KEYS.BUSINESS_PLAN, defaults);
       loadedSections = defaults;
     }
-    setSections(loadedSections.sort((a, b) => a.order - b.order));
-    if (loadedSections.length > 0) {
-      setActiveTab(loadedSections[0].id);
+    const sortedSections = loadedSections.sort((a, b) => a.order - b.order);
+    let firstTabId = '';
+    if (sortedSections.length > 0) {
+      const firstSection = sortedSections[0];
+      if (firstSection) {
+        firstTabId = firstSection.id;
+      }
     }
 
     // 2. Load or seed SWOT Items
@@ -39,13 +43,20 @@ export default function BusinessPlanPage() {
       setItems(STORAGE_KEYS.SWOT, defaults);
       loadedSwot = defaults;
     }
-    setSwotItems(loadedSwot);
 
     // 3. Load last saved timestamp
     const savedTime = getValue<string>('bp_last_saved', nowISO());
-    setLastSaved(savedTime);
 
-    setInitialized(true);
+    // Defer state updates to avoid synchronous cascading renders
+    setTimeout(() => {
+      setSections(sortedSections);
+      if (firstTabId) {
+        setActiveTab(firstTabId);
+      }
+      setSwotItems(loadedSwot);
+      setLastSaved(savedTime);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   // Save sections helper

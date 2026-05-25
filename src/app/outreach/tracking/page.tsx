@@ -12,11 +12,20 @@ export default function OutreachTrackingPage() {
 
   useEffect(() => {
     const stored = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-    setCampaigns(stored);
+    let firstCampId = '';
     if (stored.length > 0) {
-      setSelectedCampaignId(stored[0].id);
+      const firstCamp = stored[0];
+      if (firstCamp) {
+        firstCampId = firstCamp.id;
+      }
     }
-    setInitialized(true);
+    setTimeout(() => {
+      setCampaigns(stored);
+      if (firstCampId) {
+        setSelectedCampaignId(firstCampId);
+      }
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const activeCampaign = campaigns.find((c) => c.id === selectedCampaignId);
@@ -30,7 +39,7 @@ export default function OutreachTrackingPage() {
   }
 
   // Funnel calculations based on selected campaign stats
-  const stats = activeCampaign?.stats || {
+  const stats = activeCampaign?.stats ?? {
     total: 0,
     sent: 0,
     delivered: 0,
@@ -158,28 +167,28 @@ export default function OutreachTrackingPage() {
                 
                 <div className="funnel-step stagger-item">
                   <div className="funnel-label">Transmitted</div>
-                  <div className="funnel-bar" style={{ width: `${sentWidth}%`, background: 'var(--accent-blue)' }}>
-                    {stats.sent} Emails ({sentWidth}%)
+                  <div className="funnel-bar" style={{ width: `${String(sentWidth)}%`, background: 'var(--accent-blue)' }}>
+                    {stats.sent} Emails ({String(sentWidth)}%)
                   </div>
                 </div>
 
                 <div className="funnel-step stagger-item" style={{ animationDelay: '50ms' }}>
                   <div className="funnel-label">Opened</div>
-                  <div className="funnel-bar" style={{ width: `${openedWidth}%`, background: 'var(--accent-cyan)' }}>
+                  <div className="funnel-bar" style={{ width: `${String(openedWidth)}%`, background: 'var(--accent-cyan)' }}>
                     {stats.opened} ({Math.round(openedWidth)}%)
                   </div>
                 </div>
 
                 <div className="funnel-step stagger-item" style={{ animationDelay: '100ms' }}>
                   <div className="funnel-label">Clicked Link</div>
-                  <div className="funnel-bar" style={{ width: `${clickedWidth}%`, background: 'var(--accent-emerald)' }}>
+                  <div className="funnel-bar" style={{ width: `${String(clickedWidth)}%`, background: 'var(--accent-emerald)' }}>
                     {stats.clicked} ({Math.round(clickedWidth)}%)
                   </div>
                 </div>
 
                 <div className="funnel-step stagger-item" style={{ animationDelay: '150ms' }}>
                   <div className="funnel-label">Replied</div>
-                  <div className="funnel-bar" style={{ width: `${repliedWidth}%`, background: 'var(--accent-amber)' }}>
+                  <div className="funnel-bar" style={{ width: `${String(repliedWidth)}%`, background: 'var(--accent-amber)' }}>
                     {stats.replied} ({Math.round(repliedWidth)}%)
                   </div>
                 </div>
@@ -200,7 +209,7 @@ export default function OutreachTrackingPage() {
                     <strong>{openRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${openRate}%`, background: 'var(--accent-cyan)' }} />
+                    <div style={{ height: '100%', width: `${String(openRate)}%`, background: 'var(--accent-cyan)' }} />
                   </div>
                 </div>
 
@@ -210,7 +219,7 @@ export default function OutreachTrackingPage() {
                     <strong>{clickRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${clickRate}%`, background: 'var(--accent-emerald)' }} />
+                    <div style={{ height: '100%', width: `${String(clickRate)}%`, background: 'var(--accent-emerald)' }} />
                   </div>
                 </div>
 
@@ -220,7 +229,7 @@ export default function OutreachTrackingPage() {
                     <strong>{replyRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${replyRate}%`, background: 'var(--accent-amber)' }} />
+                    <div style={{ height: '100%', width: `${String(replyRate)}%`, background: 'var(--accent-amber)' }} />
                   </div>
                 </div>
               </div>

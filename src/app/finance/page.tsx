@@ -41,9 +41,13 @@ export default function FinanceOverviewPage() {
   useEffect(() => {
     const items = getItems<CostItem>(STORAGE_KEYS.COST_ITEMS);
     const projections = getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS);
-    setCostItems(items);
-    setMetrics(computeMetrics(items, projections));
-    setReady(true);
+    const computed = computeMetrics(items, projections);
+
+    setTimeout(() => {
+      setCostItems(items);
+      setMetrics(computed);
+      setReady(true);
+    }, 0);
   }, []);
 
   if (!ready) {
@@ -141,7 +145,7 @@ export default function FinanceOverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {recentCostItems.map((item, i) => (
+              {recentCostItems.map((item) => (
                 <tr key={item.id} className="stagger-item">
                   <td>{item.description}</td>
                   <td>

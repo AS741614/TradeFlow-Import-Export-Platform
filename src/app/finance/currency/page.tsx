@@ -41,7 +41,6 @@ export default function CurrencyPage() {
   };
 
   // Find symbols for display
-  const toSymbol = CURRENCIES.find((c) => c.code === toCurrency)?.symbol ?? '';
   const fromSymbol = CURRENCIES.find((c) => c.code === fromCurrency)?.symbol ?? '';
 
   return (
@@ -179,7 +178,7 @@ export default function CurrencyPage() {
             </tr>
           </thead>
           <tbody>
-            {CURRENCIES.map((c, i) => {
+            {CURRENCIES.map((c) => {
               const rate = convert(1, fromCurrency, c.code);
               const converted = convert(numericAmount, fromCurrency, c.code);
               const isSelected = c.code === toCurrency;

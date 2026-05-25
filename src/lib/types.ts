@@ -36,7 +36,7 @@ export interface ShipmentDocument {
   name: string;
   type: 'bill-of-lading' | 'commercial-invoice' | 'packing-list' | 'certificate-of-origin' | 'customs-declaration' | 'insurance' | 'other';
   status: 'pending' | 'submitted' | 'approved' | 'rejected';
-  uploadedAt?: string;
+  uploadedAt?: string | undefined;
 }
 
 export interface Shipment {
@@ -48,10 +48,10 @@ export interface Shipment {
   carrier: string;
   status: ShipmentStatus;
   estimatedArrival: string;
-  actualArrival?: string;
-  trackingNumber?: string;
+  actualArrival?: string | undefined;
+  trackingNumber?: string | undefined;
   documents: ShipmentDocument[];
-  notes?: string;
+  notes?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,7 +73,7 @@ export interface Invoice {
   number: string;
   contactId: string;
   contactName: string;
-  shipmentId?: string;
+  shipmentId?: string | undefined;
   lineItems: LineItem[];
   currency: string;
   subtotal: number;
@@ -83,8 +83,8 @@ export interface Invoice {
   status: InvoiceStatus;
   issuedDate: string;
   dueDate: string;
-  paidDate?: string;
-  notes?: string;
+  paidDate?: string | undefined;
+  notes?: string | undefined;
   createdAt: string;
 }
 
@@ -100,11 +100,11 @@ export interface Contact {
   email: string;
   phone: string;
   country: string;
-  address?: string;
+  address?: string | undefined;
   type: ContactType;
   status: ContactStatus;
-  tradeTerms?: string;
-  notes?: string;
+  tradeTerms?: string | undefined;
+  notes?: string | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -113,14 +113,14 @@ export interface Contact {
 
 export interface ComplianceItem {
   id: string;
-  shipmentId?: string;
+  shipmentId?: string | undefined;
   documentName: string;
   documentType: string;
   status: 'pending' | 'submitted' | 'approved' | 'rejected';
   requiredBy: string;
-  submittedAt?: string;
-  approvedAt?: string;
-  notes?: string;
+  submittedAt?: string | undefined;
+  approvedAt?: string | undefined;
+  notes?: string | undefined;
 }
 
 // ---- Business Plan ----
@@ -149,8 +149,8 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  dueDate?: string;
-  assignee?: string;
+  dueDate?: string | undefined;
+  assignee?: string | undefined;
   tags: string[];
   category: string;
   createdAt: string;
@@ -189,12 +189,12 @@ export interface OutreachContact {
   lastName: string;
   email: string;
   company: string;
-  phone?: string;
+  phone?: string | undefined;
   country: string;
   tags: string[];
   source: OutreachSource;
   importedAt: string;
-  lastContacted?: string;
+  lastContacted?: string | undefined;
   campaignHistory: { campaignId: string; status: EmailStatus }[];
 }
 
@@ -211,8 +211,8 @@ export interface EmailTemplate {
 
 export interface CampaignSchedule {
   type: 'immediate' | 'scheduled' | 'drip';
-  scheduledAt?: string;
-  sendsPerHour?: number;
+  scheduledAt?: string | undefined;
+  sendsPerHour?: number | undefined;
 }
 
 export interface CampaignStats {
@@ -234,7 +234,7 @@ export interface Campaign {
   status: CampaignStatus;
   schedule: CampaignSchedule;
   subjectLineA: string;
-  subjectLineB?: string;
+  subjectLineB?: string | undefined;
   stats: CampaignStats;
   createdAt: string;
   updatedAt: string;
@@ -261,5 +261,5 @@ export interface NavItem {
   label: string;
   href: string;
   icon: string;
-  children?: NavItem[];
+  children?: NavItem[] | undefined;
 }

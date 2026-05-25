@@ -36,18 +36,17 @@ export default function CompliancePage() {
   useEffect(() => {
     let storedCompliance = getItems<ComplianceItem>(STORAGE_KEYS.COMPLIANCE);
     const storedShipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
-    setShipments(storedShipments);
 
     // If there's no compliance items, let's seed a couple default ones if we have shipments, or just standard ones
     if (storedCompliance.length === 0) {
-      const now = nowISO().split('T')[0];
+      const now = nowISO().split('T')[0] ?? ''; // strict-ts-deferred: assert at constants source in later prompt
       const defaults: ComplianceItem[] = [
         {
           id: generateId(),
           documentName: 'Export Customs Declaration',
           documentType: 'customs-declaration',
           status: 'pending',
-          requiredBy: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          requiredBy: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
           notes: 'Required for cargo clearance at local custom port.',
         },
         {
@@ -60,24 +59,30 @@ export default function CompliancePage() {
         },
       ];
 
-      if (storedShipments.length > 0) {
-        defaults[0].shipmentId = storedShipments[0].id;
-        defaults[1].shipmentId = storedShipments[0].id;
+      const d0 = defaults[0];
+      const d1 = defaults[1];
+      const s0 = storedShipments[0];
+      if (d0 && d1 && s0) {
+        d0.shipmentId = s0.id;
+        d1.shipmentId = s0.id;
       }
 
       defaults.forEach((item) => addItem(STORAGE_KEYS.COMPLIANCE, item));
       storedCompliance = defaults;
     }
 
-    setComplianceItems(storedCompliance);
-    setInitialized(true);
+    setTimeout(() => {
+      setShipments(storedShipments);
+      setComplianceItems(storedCompliance);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const openAdd = useCallback(() => {
     setEditingId(null);
     setForm({
       ...EMPTY_FORM,
-      requiredBy: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      requiredBy: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
     });
     setShowModal(true);
   }, []);
@@ -85,12 +90,12 @@ export default function CompliancePage() {
   const openEdit = useCallback((item: ComplianceItem) => {
     setEditingId(item.id);
     setForm({
-      shipmentId: item.shipmentId || '',
+      shipmentId: item.shipmentId ?? '',
       documentName: item.documentName,
       documentType: item.documentType,
       status: item.status,
       requiredBy: item.requiredBy,
-      notes: item.notes || '',
+      notes: item.notes ?? '',
     });
     setShowModal(true);
   }, []);
@@ -354,7 +359,7 @@ export default function CompliancePage() {
                     id="select-compliance-status"
                     className="form-select"
                     value={form.status}
-                    onChange={(e) => updateField('status', e.target.value as any)}
+                    onChange={(e) => updateField('status', e.target.value as 'pending' | 'submitted' | 'approved' | 'rejected')}
                   >
                     <option value="pending">Pending Documents</option>
                     <option value="submitted">Submitted (Under Review)</option>

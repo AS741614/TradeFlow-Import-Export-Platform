@@ -99,7 +99,7 @@ export default function OutreachDashboardPage() {
     );
     const totalSent = allCampaigns.reduce((sum, c) => sum + c.stats.sent, 0);
 
-    setMetrics([
+    const nextMetrics: MetricData[] = [
       {
         label: 'Total Contacts',
         value: formatNumber(contacts.length),
@@ -124,10 +124,15 @@ export default function OutreachDashboardPage() {
         color: 'cyan',
         icon: <EmailIcon />,
       },
-    ]);
+    ];
 
-    setCampaigns(allCampaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    setInitialized(true);
+    const sortedCampaigns = allCampaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    setTimeout(() => {
+      setMetrics(nextMetrics);
+      setCampaigns(sortedCampaigns);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const quickActions: QuickAction[] = [
@@ -206,7 +211,7 @@ export default function OutreachDashboardPage() {
           </h3>
           {campaigns.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-              {campaigns.slice(0, 5).map((campaign, i) => (
+              {campaigns.slice(0, 5).map((campaign) => (
                 <div
                   key={campaign.id}
                   className="stagger-item"

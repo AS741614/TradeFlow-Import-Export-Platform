@@ -25,12 +25,11 @@ function MetricIcon({ name }: { name: string }) {
     revenue: <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
     alert: <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
   };
-  return <>{icons[name] || icons.products}</>;
+  return <>{icons[name] ?? icons.products}</>;
 }
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<MetricData[]>([]);
-  const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
   const [urgentTasks, setUrgentTasks] = useState<Task[]>([]);
   const [initialized, setInitialized] = useState(false);
 
@@ -67,20 +66,24 @@ export default function DashboardPage() {
     const completedTasks = tasks.filter(t => t.status === 'done').length;
     const totalEmailsSent = campaigns.reduce((sum, c) => sum + c.stats.sent, 0);
 
-    setMetrics([
+    const nextMetrics: MetricData[] = [
       { label: 'Total Products', value: formatNumber(products.length), color: 'blue', icon: <MetricIcon name="products" /> },
       { label: 'Active Shipments', value: formatNumber(activeShipments), color: 'cyan', icon: <MetricIcon name="shipments" /> },
       { label: 'Pending Invoices', value: formatNumber(pendingInvoices), color: 'amber', icon: <MetricIcon name="invoices" /> },
       { label: 'Total Contacts', value: formatNumber(contacts.length), color: 'purple', icon: <MetricIcon name="contacts" /> },
-      { label: 'Tasks Completed', value: `${completedTasks}/${tasks.length}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
+      { label: 'Tasks Completed', value: `${String(completedTasks)}/${String(tasks.length)}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
       { label: 'Low Stock Alerts', value: formatNumber(lowStock), color: 'red', icon: <MetricIcon name="alert" /> },
       { label: 'Emails Sent', value: formatNumber(totalEmailsSent), color: 'blue', icon: <MetricIcon name="email" /> },
       { label: 'Revenue (Est.)', value: formatCurrency(0), color: 'emerald', icon: <MetricIcon name="revenue" /> },
-    ]);
+    ];
 
-    setRecentShipments(shipments.slice(0, 5));
-    setUrgentTasks(tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5));
-    setInitialized(true);
+    const urgentList = tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5);
+
+    setTimeout(() => {
+      setMetrics(nextMetrics);
+      setUrgentTasks(urgentList);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   if (!initialized) {
@@ -106,7 +109,7 @@ export default function DashboardPage() {
 
       {/* Metric Cards */}
       <div className="grid-4" style={{ marginBottom: 'var(--space-xl)' }}>
-        {metrics.map((metric, i) => (
+        {metrics.map((metric) => (
           <div key={metric.label} className={`metric-card ${metric.color} stagger-item`}>
             <div className={`metric-card-icon ${metric.color}`}>
               {metric.icon}
@@ -128,7 +131,7 @@ export default function DashboardPage() {
           </h3>
           {urgentTasks.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-              {urgentTasks.map((task, i) => (
+              {urgentTasks.map((task) => (
                 <div key={task.id} className="stagger-item" style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -174,7 +177,7 @@ export default function DashboardPage() {
               { label: 'Financial Report', href: '/finance', icon: '💰' },
               { label: 'Business Plan', href: '/business-plan', icon: '📊' },
               { label: 'View Projects', href: '/projects', icon: '📋' },
-            ].map((action, i) => (
+            ].map((action) => (
               <a
                 key={action.label}
                 href={action.href}

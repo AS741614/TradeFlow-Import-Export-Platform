@@ -26,7 +26,7 @@ function NavIcon({ name }: { name: string }) {
     campaigns: <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
     tracking: <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   };
-  return <span className="sidebar-nav-icon">{icons[name] || icons.dashboard}</span>;
+  return <span className="sidebar-nav-icon">{icons[name] ?? icons.dashboard}</span>;
 }
 
 export default function Sidebar() {

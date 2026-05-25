@@ -77,8 +77,10 @@ export default function OutreachTemplatesPage() {
       stored = seeded;
     }
 
-    setTemplates(stored);
-    setInitialized(true);
+    setTimeout(() => {
+      setTemplates(stored);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const openAdd = useCallback(() => {

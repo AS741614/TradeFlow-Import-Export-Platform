@@ -21,9 +21,7 @@ export function parseCSV(text: string): string[][] {
     let inQuotes = false;
     let currentToken = '';
 
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-
+    for (const char of line) {
       if (char === '"') {
         inQuotes = !inQuotes;
       } else if (char === ',' && !inQuotes) {
@@ -53,24 +51,31 @@ export function mapParsedDataToContacts(
   const now = nowISO();
 
   for (const row of rows) {
-    const email = row[mappings.email] || '';
+    const emailIdx = mappings.email;
+    const email = (emailIdx !== undefined ? row[emailIdx] : '') ?? '';
     
     // Skip rows without valid email addresses
     if (!email || !isValidEmail(email)) continue;
 
     // Get tags from header tags column if present or set empty array
-    const tagsIdx = mappings.tags !== undefined ? mappings.tags : -1;
-    const rawTags = tagsIdx !== -1 && row[tagsIdx] ? row[tagsIdx].split(';') : [];
+    const tagsIdx = mappings.tags;
+    const rawTags = (tagsIdx !== undefined && row[tagsIdx]) ? row[tagsIdx].split(';') : [];
     const cleanTags = rawTags.map(t => t.trim()).filter(Boolean);
+
+    const firstNameIdx = mappings.firstName;
+    const lastNameIdx = mappings.lastName;
+    const companyIdx = mappings.company;
+    const phoneIdx = mappings.phone;
+    const countryIdx = mappings.country;
 
     const contact: OutreachContact = {
       id: generateId(),
-      firstName: row[mappings.firstName] || '',
-      lastName: row[mappings.lastName] || '',
+      firstName: (firstNameIdx !== undefined ? row[firstNameIdx] : '') ?? '',
+      lastName: (lastNameIdx !== undefined ? row[lastNameIdx] : '') ?? '',
       email: email.toLowerCase(),
-      company: row[mappings.company] || 'Unknown Company',
-      phone: mappings.phone !== undefined ? row[mappings.phone] : undefined,
-      country: mappings.country !== undefined ? row[mappings.country] : 'United States',
+      company: (companyIdx !== undefined ? row[companyIdx] : '') ?? 'Unknown Company',
+      phone: phoneIdx !== undefined ? row[phoneIdx] : undefined,
+      country: (countryIdx !== undefined ? row[countryIdx] : undefined) ?? 'United States',
       tags: cleanTags.length > 0 ? cleanTags : ['imported'],
       source,
       importedAt: now,
@@ -83,34 +88,72 @@ export function mapParsedDataToContacts(
   return contacts;
 }
 
+interface RawContactItem {
+  firstName?: unknown;
+  FirstName?: unknown;
+  first_name?: unknown;
+  lastName?: unknown;
+  LastName?: unknown;
+  last_name?: unknown;
+  email?: unknown;
+  Email?: unknown;
+  company?: unknown;
+  Company?: unknown;
+  phone?: unknown;
+  Phone?: unknown;
+  country?: unknown;
+  Country?: unknown;
+  tags?: unknown;
+}
+
 /**
  * Safely parse JSON text and extract contact objects.
  */
 export function parseJSONContacts(text: string): OutreachContact[] {
   const now = nowISO();
   try {
-    const raw = JSON.parse(text);
-    const list = Array.isArray(raw) ? raw : [raw];
+    const raw = JSON.parse(text) as unknown;
+    const list = Array.isArray(raw) ? (raw as unknown[]) : [raw];
     const contacts: OutreachContact[] = [];
 
-    for (const item of list) {
-      const email = item.email || item.Email || '';
+    for (const rawItem of list) {
+      if (!rawItem || typeof rawItem !== 'object') continue;
+      const item = rawItem as RawContactItem;
+
+      const emailRaw = item.email ?? item.Email ?? '';
+      const email = typeof emailRaw === 'string' ? emailRaw : '';
       if (!email || !isValidEmail(email)) continue;
 
-      const tags = Array.isArray(item.tags)
-        ? item.tags
-        : typeof item.tags === 'string'
-        ? item.tags.split(',').map((t: string) => t.trim())
-        : ['imported-json'];
+      let tags: string[] = ['imported-json'];
+      if (Array.isArray(item.tags)) {
+        tags = item.tags.map((t) => String(t));
+      } else if (typeof item.tags === 'string') {
+        tags = item.tags.split(',').map((t) => t.trim());
+      }
+
+      const firstNameRaw = item.firstName ?? item.FirstName ?? item.first_name ?? '';
+      const firstName = typeof firstNameRaw === 'string' ? firstNameRaw : '';
+
+      const lastNameRaw = item.lastName ?? item.LastName ?? item.last_name ?? '';
+      const lastName = typeof lastNameRaw === 'string' ? lastNameRaw : '';
+
+      const companyRaw = item.company ?? item.Company ?? 'Unknown Company';
+      const company = typeof companyRaw === 'string' ? companyRaw : 'Unknown Company';
+
+      const phoneRaw = item.phone ?? item.Phone ?? undefined;
+      const phone = typeof phoneRaw === 'string' ? phoneRaw : undefined;
+
+      const countryRaw = item.country ?? item.Country ?? 'United States';
+      const country = typeof countryRaw === 'string' ? countryRaw : 'United States';
 
       contacts.push({
         id: generateId(),
-        firstName: item.firstName || item.FirstName || item.first_name || '',
-        lastName: item.lastName || item.LastName || item.last_name || '',
+        firstName,
+        lastName,
         email: email.toLowerCase(),
-        company: item.company || item.Company || 'Unknown Company',
-        phone: item.phone || item.Phone || undefined,
-        country: item.country || item.Country || 'United States',
+        company,
+        phone,
+        country,
         tags: tags.filter(Boolean),
         source: 'json',
         importedAt: now,

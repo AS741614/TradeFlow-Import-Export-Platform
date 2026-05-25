@@ -11,11 +11,11 @@ const EMPTY_FORM = {
   contactPerson: '',
   email: '',
   phone: '',
-  country: COUNTRIES[0],
+  country: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
   address: '',
   type: 'buyer' as ContactType,
   status: 'active' as ContactStatus,
-  tradeTerms: INCOTERMS[0],
+  tradeTerms: INCOTERMS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
   notes: '',
 };
 
@@ -30,8 +30,11 @@ export default function ContactsPage() {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    setContacts(getItems<Contact>(STORAGE_KEYS.CONTACTS));
-    setInitialized(true);
+    const data = getItems<Contact>(STORAGE_KEYS.CONTACTS);
+    setTimeout(() => {
+      setContacts(data);
+      setInitialized(true);
+    }, 0);
   }, []);
 
   const filtered = contacts.filter((c) => {
@@ -63,11 +66,11 @@ export default function ContactsPage() {
       email: contact.email,
       phone: contact.phone,
       country: contact.country,
-      address: contact.address || '',
+      address: contact.address ?? '',
       type: contact.type,
       status: contact.status,
-      tradeTerms: contact.tradeTerms || INCOTERMS[0],
-      notes: contact.notes || '',
+      tradeTerms: contact.tradeTerms ?? INCOTERMS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      notes: contact.notes ?? '',
     });
     setShowModal(true);
   }, []);

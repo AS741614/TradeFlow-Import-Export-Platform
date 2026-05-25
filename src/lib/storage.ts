@@ -12,7 +12,7 @@ export function getItems<T>(key: string): T[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? (JSON.parse(raw) as T[]) : [];
   } catch {
     console.error(`Failed to parse localStorage key: ${key}`);
     return [];
@@ -22,6 +22,7 @@ export function getItems<T>(key: string): T[] {
 /**
  * Get a single item by id from a collection.
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 export function getItemById<T extends { id: string }>(key: string, id: string): T | undefined {
   const items = getItems<T>(key);
   return items.find(item => item.id === id);
@@ -30,7 +31,7 @@ export function getItemById<T extends { id: string }>(key: string, id: string): 
 /**
  * Save entire collection to localStorage.
  */
-export function setItems<T>(key: string, items: T[]): void {
+export function setItems(key: string, items: unknown[]): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(items));
@@ -56,8 +57,11 @@ export function updateItem<T extends { id: string }>(key: string, id: string, up
   const items = getItems<T>(key);
   const index = items.findIndex(item => item.id === id);
   if (index !== -1) {
-    items[index] = { ...items[index], ...updates };
-    setItems(key, items);
+    const existing = items[index];
+    if (existing) {
+      items[index] = Object.assign({}, existing, updates);
+      setItems(key, items);
+    }
   }
   return items;
 }
@@ -78,7 +82,7 @@ export function getValue<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') return defaultValue;
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
-    return raw ? JSON.parse(raw) : defaultValue;
+    return raw ? (JSON.parse(raw) as T) : defaultValue;
   } catch {
     return defaultValue;
   }
@@ -87,7 +91,7 @@ export function getValue<T>(key: string, defaultValue: T): T {
 /**
  * Set a single value (non-array) in localStorage.
  */
-export function setValue<T>(key: string, value: T): void {
+export function setValue(key: string, value: unknown): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));

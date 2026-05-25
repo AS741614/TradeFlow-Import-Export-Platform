@@ -2,7 +2,7 @@
 // TradeFlow — Constants & Seed Data
 // ============================================================
 
-import type { NavItem, Task, SwotItem, BusinessPlanSection, Product, Shipment, Contact, Invoice } from './types';
+import type { NavItem, Task, SwotItem, BusinessPlanSection, Product, Contact } from './types';
 import { generateId, nowISO } from './utils';
 
 // ---- Navigation Structure ----
