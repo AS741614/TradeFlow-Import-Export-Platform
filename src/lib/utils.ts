@@ -179,3 +179,6 @@ export function getStatusColor(status: string): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+// Deliberate type error to test the CI wall
+const _testBreak: string = 42;
