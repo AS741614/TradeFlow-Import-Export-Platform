@@ -1,28 +1,31 @@
 # TradeFlow Project Cursor Rules
+Single-owner local-first Import/Export operations and outreach platform.
 
-This project is a TypeScript Next.js App Router application designed for managing import/export trade operations. Follow these guidelines strictly.
+## 🛠️ Stack & Styling Constraints
+- **Stack**: Next.js 16 (App Router), React 19, TypeScript (strictly no `any`).
+- **Styling**: Vanilla CSS in [src/app/globals.css](file:///src/app/globals.css) with CSS variables.
+- **Forbidden**: Tailwind CSS, CSS Modules, CSS-in-JS, and React inline style properties (except dynamic numerical values).
+- **Icons & Animation**: Inline SVGs only (no libraries). Apply `.stagger-item` for entry animations.
 
-## 🛠️ Tech Stack & Constraints
-- **Framework**: Next.js App Router (React 19, Next.js 16)
-- **Language**: TypeScript (strict types, no `any`)
-- **Styling**: Vanilla CSS (specifically targeting the custom utilities and rules defined inside [globals.css](file:///src/app/globals.css)). Do NOT use Tailwind CSS, CSS Modules, or external style sheets unless explicitly requested.
-- **State & Data**: Local-first storage model. Use [storage.ts](file:///src/lib/storage.ts) for reading and writing records to `localStorage`. Never create a remote database or server-side API dependencies unless instructed.
+## 💾 Persistence & Portability
+- **Storage**: Mediated EXCLUSIVELY via [src/lib/storage.ts](file:///src/lib/storage.ts) (local-first TODAY, backend-portable TOMORROW).
+- **Restrictions**: Do NOT call `localStorage` or reference storage keys directly in components (use `STORAGE_KEYS` object).
+- **Domain Mappings**: Group keys in `STORAGE_KEYS` mentally by domain owner with inline comment descriptors.
+- **Serialization**: TypeScript types in `types.ts` must be JSON-serializable. Save dates as ISO 8601 strings, not JS `Date` objects.
 
-## 📁 Key Files Reference
-- Core Interfaces: [types.ts](file:///src/lib/types.ts)
-- localStorage Helpers: [storage.ts](file:///src/lib/storage.ts)
-- Seed Data / Constants: [constants.ts](file:///src/lib/constants.ts)
-- Utilities & Formats: [utils.ts](file:///src/lib/utils.ts)
-- Stylesheet Design System: [globals.css](file:///src/app/globals.css)
+## 📝 Conventions & Code Structure
+- **React**: Next.js Server Components by default; `"use client"` only at interactive leaves.
+- **Identifiers**: Every interactive element (inputs, buttons, modal triggers, links) must have a unique `id` attribute.
+- **Paths**: Use absolute `@/*` aliases. No deep relative imports.
+- **Commits**: Follow Conventional Commits format.
 
-## 💡 Code Conventions & Best Practices
-- **Client Components**: Mark interactive client-side pages with `'use client';` at the top of the file.
-- **Interactions**: Every interactive UI element (inputs, buttons, select, modals) MUST have a unique `id` attribute for testing purposes.
-- **Local Persistence**: Use `STORAGE_KEYS` constants from `storage.ts` when retrieving or storing datasets to ensure key consistency.
-- **SVG Icons**: Embed inline SVG paths instead of importing heavy image files or font libraries. Inline SVGs automatically inherit size and color properties from `globals.css`.
-- **Transitions**: Apply the `.stagger-item` class to lists of cards, rows, or list elements to activate CSS slide-up entry animations.
+## 🚀 Verification Gate Pipeline
+Run the following sequence in order before declaring task completion:
+1. `npx tsc --noEmit`
+2. `npm run lint` (If script absent, mark as: `SKIPPED — to be configured in a later prompt`)
+3. `npm test` (If runner absent, skip)
+4. `npm run build`
 
-## 🚀 Terminal Commands
-- Run development server: `npm run dev`
-- Production compilation build: `npm run build`
-- Type checking verification: `npx tsc --noEmit`
+## 🎯 Scope Discipline & Pointers
+- Only edit files listed in the "Allowed Files" allowlist. No unrelated drive-by edits.
+- *Full specifications in [AGENTS.md](file:///AGENTS.md) / [CLAUDE.md](file:///CLAUDE.md). Test rules in [TESTING.md](file:///TESTING.md).*

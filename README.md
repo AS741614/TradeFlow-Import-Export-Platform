@@ -1,5 +1,15 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Governance
+
+This project is governed by four documents:
+- `AGENTS.md` — full spec for AI coding agents
+- `CLAUDE.md` — mirror of AGENTS.md
+- `.cursorrules` — compressed cross-tool summary
+- `TESTING.md` — test discipline and conventions
+
+Any AI agent or human contributor must read AGENTS.md before making changes.
+
 ## Getting Started
 
 First, run the development server:
