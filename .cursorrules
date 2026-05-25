@@ -1,0 +1,28 @@
+# TradeFlow Project Cursor Rules
+
+This project is a TypeScript Next.js App Router application designed for managing import/export trade operations. Follow these guidelines strictly.
+
+## 🛠️ Tech Stack & Constraints
+- **Framework**: Next.js App Router (React 19, Next.js 16)
+- **Language**: TypeScript (strict types, no `any`)
+- **Styling**: Vanilla CSS (specifically targeting the custom utilities and rules defined inside [globals.css](file:///src/app/globals.css)). Do NOT use Tailwind CSS, CSS Modules, or external style sheets unless explicitly requested.
+- **State & Data**: Local-first storage model. Use [storage.ts](file:///src/lib/storage.ts) for reading and writing records to `localStorage`. Never create a remote database or server-side API dependencies unless instructed.
+
+## 📁 Key Files Reference
+- Core Interfaces: [types.ts](file:///src/lib/types.ts)
+- localStorage Helpers: [storage.ts](file:///src/lib/storage.ts)
+- Seed Data / Constants: [constants.ts](file:///src/lib/constants.ts)
+- Utilities & Formats: [utils.ts](file:///src/lib/utils.ts)
+- Stylesheet Design System: [globals.css](file:///src/app/globals.css)
+
+## 💡 Code Conventions & Best Practices
+- **Client Components**: Mark interactive client-side pages with `'use client';` at the top of the file.
+- **Interactions**: Every interactive UI element (inputs, buttons, select, modals) MUST have a unique `id` attribute for testing purposes.
+- **Local Persistence**: Use `STORAGE_KEYS` constants from `storage.ts` when retrieving or storing datasets to ensure key consistency.
+- **SVG Icons**: Embed inline SVG paths instead of importing heavy image files or font libraries. Inline SVGs automatically inherit size and color properties from `globals.css`.
+- **Transitions**: Apply the `.stagger-item` class to lists of cards, rows, or list elements to activate CSS slide-up entry animations.
+
+## 🚀 Terminal Commands
+- Run development server: `npm run dev`
+- Production compilation build: `npm run build`
+- Type checking verification: `npx tsc --noEmit`
