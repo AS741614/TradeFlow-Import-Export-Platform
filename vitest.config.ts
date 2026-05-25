@@ -25,6 +25,27 @@ export default defineConfig({
         'src/app/api/**',            // API routes — covered in a later phase
         '**/*.d.ts',
       ],
+      thresholds: {
+        perFile: true,
+        'src/lib/storage.ts': {
+          statements: 100,
+          branches: 83,
+          functions: 100,
+          lines: 100,
+        },
+        'src/lib/templateEngine.ts': {
+          statements: 100,
+          branches: 90,
+          functions: 100,
+          lines: 100,
+        },
+        'src/lib/utils.ts': {
+          statements: 100,
+          branches: 100,
+          functions: 100,
+          lines: 100,
+        },
+      },
     },
   },
 });
