@@ -127,3 +127,4 @@ Every agent completion response must include:
 - `TESTING.md` — Testing philosophies, Vitest/Playwright conventions, and localStorage mock setups.
 - `.cursorrules` — Compressed workspace instructions for Cursor IDE.
 - `README.md` — Developer onboarding overview.
+- `.env.example` — Template defining local PostgreSQL environment variables.

@@ -30,6 +30,30 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Local Database Setup
+
+This project uses PostgreSQL for development data. Follow these steps to provision and verify the local database:
+
+1. **Prerequisites**: Make sure Docker Desktop is installed and running.
+2. **Setup Local Env**: Copy the env template file to your local configuration:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. **Start Postgres Container**:
+   ```bash
+   npm run db:up
+   ```
+   This pulls the `postgres:16-alpine` image and spins up the container named `tradeflow-postgres` on port `5432`.
+4. **Verify Connectivity**:
+   ```bash
+   npm run db:check
+   ```
+   This script runs a test connection using the `DATABASE_URL` in `.env.local`.
+5. **Stop Container**:
+   ```bash
+   npm run db:down
+   ```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
