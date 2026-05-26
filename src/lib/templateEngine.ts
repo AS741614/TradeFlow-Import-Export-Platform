@@ -8,7 +8,7 @@ import type { OutreachContact } from './types';
  * Extract all unique variables in the format {{variable_name}} from a template string.
  */
 export function extractVariables(text: string): string[] {
-  const matches = text.matchAll(/\{\{([a-zA-Z0-9_]+)\}\}/g);
+  const matches = text.matchAll(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g);
   const vars = new Set<string>();
   for (const match of matches) {
     const variableName = match[1];

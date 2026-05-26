@@ -21,11 +21,10 @@ describe('extractVariables', () => {
     expect(vars).toEqual([]);
   });
 
-  it('should not extract variables containing spaces due to regex design', () => {
-    // Variable extraction regex is /\{\{([a-zA-Z0-9_]+)\}\}/g which does not support spaces inside braces
-    const text = 'Hello {{ first_name }}, how are you?';
+  it('should extract variables containing internal whitespace and hyphens', () => {
+    const text = 'Hello {{ first_name }}, how is {{  company   }} and {{ custom-field }}?';
     const vars = extractVariables(text);
-    expect(vars).toEqual([]);
+    expect(vars).toEqual(['first_name', 'company', 'custom-field']);
   });
 });
 

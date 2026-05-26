@@ -20,7 +20,8 @@ export default tseslint.config(
       "node_modules/**",
       "public/**",
       "next-env.d.ts",
-      "eslint.config.mjs"
+      "eslint.config.mjs",
+      "coverage/**"
     ]
   },
   js.configs.recommended,

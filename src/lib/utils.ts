@@ -60,9 +60,21 @@ export function getRelativeTime(dateStr: string): string {
   const now = Date.now();
   const then = new Date(dateStr).getTime();
   const diffMs = now - then;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+  const isFuture = diffMs < 0;
+  const absDiffMs = Math.abs(diffMs);
+  
+  const diffMins = Math.floor(absDiffMs / 60000);
+  const diffHours = Math.floor(absDiffMs / 3600000);
+  const diffDays = Math.floor(absDiffMs / 86400000);
+
+  if (isFuture) {
+    if (diffMins < 1) return 'in 1m';
+    if (diffMins < 60) return `in ${String(diffMins)}m`;
+    if (diffHours < 24) return `in ${String(diffHours)}h`;
+    if (diffDays < 7) return `in ${String(diffDays)}d`;
+    if (diffDays < 30) return `in ${String(Math.floor(diffDays / 7))}w`;
+    return formatDate(dateStr);
+  }
 
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${String(diffMins)}m ago`;

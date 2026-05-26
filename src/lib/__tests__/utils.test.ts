@@ -118,10 +118,19 @@ describe('getRelativeTime', () => {
     expect(getRelativeTime('2026-04-15T12:00:00Z')).toBe('Apr 15, 2026');
   });
 
-  it('should return Just now for future dates due to negative differences', () => {
-    // This is the known bug / architectural limitation:
+  it('should return forward-looking relative strings for future dates', () => {
     // Future date tomorrow (relative to mock system time May 25, 2026)
-    expect(getRelativeTime('2026-05-26T12:00:00Z')).toBe('Just now');
+    expect(getRelativeTime('2026-05-26T12:00:00Z')).toBe('in 1d');
+    // Future date in 30 seconds
+    expect(getRelativeTime('2026-05-25T12:00:30Z')).toBe('in 1m');
+    // Future date in 10 minutes
+    expect(getRelativeTime('2026-05-25T12:10:00Z')).toBe('in 10m');
+    // Future date in 5 hours
+    expect(getRelativeTime('2026-05-25T17:00:00Z')).toBe('in 5h');
+    // Future date in 2 weeks
+    expect(getRelativeTime('2026-06-08T12:00:00Z')).toBe('in 2w');
+    // Future date > 30 days (40 days)
+    expect(getRelativeTime('2026-07-04T12:00:00Z')).toBe('Jul 4, 2026');
   });
 });
 
