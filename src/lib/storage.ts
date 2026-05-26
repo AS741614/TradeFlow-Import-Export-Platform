@@ -1,20 +1,55 @@
 // ============================================================
-// TradeFlow — localStorage CRUD wrapper
+// TradeFlow — API-Backed Storage Client
 // ============================================================
 
-const STORAGE_PREFIX = 'tradeflow_';
+import { apiFetch, StorageError } from './api-client';
 
 /**
- * Get items from localStorage by key.
- * Returns typed array or empty array if not found.
+ * Maps generic storage keys to REST API paths.
  */
-export function getItems<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
+function getEndpoint(key: string): string {
+  switch (key) {
+    case 'products':
+      return '/api/products';
+    case 'shipments':
+      return '/api/shipments';
+    case 'invoices':
+      return '/api/invoices';
+    case 'contacts':
+      return '/api/contacts';
+    case 'compliance':
+      return '/api/compliance';
+    case 'tasks':
+      return '/api/tasks';
+    case 'business_plan':
+      return '/api/business-plan';
+    case 'swot_items':
+      return '/api/swot';
+    case 'projections':
+      return '/api/financial-projections';
+    case 'cost_items':
+      return '/api/cost-items';
+    case 'outreach_contacts':
+      return '/api/outreach-contacts';
+    case 'email_templates':
+      return '/api/email-templates';
+    case 'campaigns':
+      return '/api/campaigns';
+    default:
+      return `/api/${key}`;
+  }
+}
+
+/**
+ * Get items from API.
+ * Returns Promise of typed array.
+ */
+export async function getItems<T>(key: string): Promise<T[]> {
+  const endpoint = getEndpoint(key);
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key);
-    return raw ? (JSON.parse(raw) as T[]) : [];
-  } catch {
-    console.error(`Failed to parse localStorage key: ${key}`);
+    return await apiFetch<T[]>('GET', endpoint);
+  } catch (error) {
+    console.error(`Failed to fetch items for key ${key}:`, error);
     return [];
   }
 }
@@ -22,99 +57,92 @@ export function getItems<T>(key: string): T[] {
 /**
  * Get a single item by id from a collection.
  */
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function getItemById<T extends { id: string }>(key: string, id: string): T | undefined {
-  const items = getItems<T>(key);
-  return items.find(item => item.id === id);
+export async function getItemById<T extends { id: string }>(key: string, id: string): Promise<T | undefined> {
+  const endpoint = `${getEndpoint(key)}/${id}`;
+  try {
+    return await apiFetch<T>('GET', endpoint);
+  } catch (error) {
+    if (error instanceof StorageError && error.statusCode === 404) {
+      return undefined;
+    }
+    console.error(`Failed to fetch item by ID ${id} for key ${key}:`, error);
+    return undefined;
+  }
 }
 
 /**
- * Save entire collection to localStorage.
+ * Save entire collection.
+ * Deprecated/Not supported in Prompt 9a. Returns rejected Promise.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function setItems<T>(key: string, items: T[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(items));
-  } catch (e) {
-    console.error(`Failed to save to localStorage key: ${key}`, e);
-  }
+export function setItems<T extends { id: string }>(key: string, items: T[]): Promise<void> {
+  void key;
+  void items;
+  return Promise.reject(
+    new StorageError(
+      'setItems bulk replace is not supported via API. ' +
+      'Use individual addItem/updateItem/removeItem calls, or add ' +
+      'a transactional bulk endpoint in a future prompt.',
+      501
+    )
+  );
 }
 
 /**
  * Add a new item to a collection.
  */
-export function addItem<T extends { id: string }>(key: string, item: T): T[] {
-  const items = getItems<T>(key);
-  items.push(item);
-  setItems(key, items);
-  return items;
+export async function addItem<T extends { id: string }>(key: string, item: T): Promise<T[]> {
+  const endpoint = getEndpoint(key);
+  try {
+    await apiFetch<T>('POST', endpoint, item);
+  } catch (error) {
+    console.error(`Failed to add item to key ${key}:`, error);
+  }
+  return getItems<T>(key);
 }
 
 /**
  * Update an existing item in a collection by id.
  */
-export function updateItem<T extends { id: string }>(key: string, id: string, updates: Partial<T>): T[] {
-  const items = getItems<T>(key);
-  const index = items.findIndex(item => item.id === id);
-  if (index !== -1) {
-    const existing = items[index];
-    if (existing) {
-      items[index] = Object.assign({}, existing, updates);
-      setItems(key, items);
-    }
+export async function updateItem<T extends { id: string }>(key: string, id: string, updates: Partial<T>): Promise<T[]> {
+  const endpoint = `${getEndpoint(key)}/${id}`;
+  try {
+    await apiFetch<T>('PATCH', endpoint, updates);
+  } catch (error) {
+    console.error(`Failed to update item ${id} for key ${key}:`, error);
   }
-  return items;
+  return getItems<T>(key);
 }
 
 /**
  * Remove an item from a collection by id.
  */
-export function removeItem<T extends { id: string }>(key: string, id: string): T[] {
-  const items = getItems<T>(key).filter(item => item.id !== id);
-  setItems(key, items);
-  return items;
-}
-
-/**
- * Get a single value (non-array) from localStorage.
- */
-export function getValue<T>(key: string, defaultValue: T): T {
-  if (typeof window === 'undefined') return defaultValue;
+export async function removeItem<T extends { id: string }>(key: string, id: string): Promise<T[]> {
+  const endpoint = `${getEndpoint(key)}/${id}`;
   try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key);
-    return raw ? (JSON.parse(raw) as T) : defaultValue;
-  } catch {
-    return defaultValue;
+    await apiFetch<T>('DELETE', endpoint);
+  } catch (error) {
+    console.error(`Failed to delete item ${id} for key ${key}:`, error);
   }
+  return getItems<T>(key);
 }
 
 /**
- * Set a single value (non-array) in localStorage.
+ * Get a single value (non-array).
+ * Stubbed for Prompt 9a. Real implementation deferred to Prompt 9b.
+ */
+export function getValue<T>(key: string, defaultValue: T): Promise<T> {
+  void key;
+  return Promise.resolve(defaultValue);
+}
+
+/**
+ * Set a single value (non-array).
+ * Stubbed for Prompt 9a. Real implementation deferred to Prompt 9b.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function setValue<T>(key: string, value: T): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
-  } catch (e) {
-    console.error(`Failed to save value to localStorage key: ${key}`, e);
-  }
+export function setValue<T>(key: string, value: T): Promise<void> {
+  void key;
+  void value;
+  return Promise.resolve();
 }
-
-// Storage keys as constants to prevent typos
-export const STORAGE_KEYS = {
-  PRODUCTS: 'products',
-  SHIPMENTS: 'shipments',
-  INVOICES: 'invoices',
-  CONTACTS: 'contacts',
-  COMPLIANCE: 'compliance',
-  TASKS: 'tasks',
-  BUSINESS_PLAN: 'business_plan',
-  SWOT: 'swot_items',
-  PROJECTIONS: 'projections',
-  COST_ITEMS: 'cost_items',
-  OUTREACH_CONTACTS: 'outreach_contacts',
-  EMAIL_TEMPLATES: 'email_templates',
-  CAMPAIGNS: 'campaigns',
-} as const;

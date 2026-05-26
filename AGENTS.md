@@ -22,13 +22,13 @@ This document serves as the authoritative specification for all developers and A
 ---
 
 ## Section 2: Architectural Commitments
-- **Persistence Encapsulation**: All read and write operations MUST be mediated exclusively through `src/lib/storage.ts`.
-- **LocalStorage Restriction**: UI components and pages MUST NOT reference `localStorage` directly.
-- **Storage Keys Isolation**: UI components and pages MUST NOT reference storage key strings directly. They must access them only via the exported `STORAGE_KEYS` object.
+- **Persistence Encapsulation**: All read and write operations MUST be mediated exclusively through `src/lib/storage.ts` using the asynchronous `api-client.ts` fetch wrapper.
+- **LocalStorage Restriction**: The codebase MUST NOT use `localStorage` anywhere. It is completely deprecated and removed.
+- **Async Implementation**: All storage operations (CRUD functions in `storage.ts`) MUST return async `Promise` signatures (e.g. `Promise<T[]>` or `Promise<T>`).
 - **JSON Serialization**: All domain types declared inside `src/lib/types.ts` must be fully JSON-serializable. Date attributes must use ISO 8601 strings (e.g., `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm:ssZ`) rather than JS `Date` objects.
-- **Async Portability Signature**: To protect the future migration to a client-server remote database, all storage operations (CRUD functions in `storage.ts`) must be design-expressible as async function signatures (returning `Promise<T>`), even if they resolve synchronously today under `localStorage`.
-- **Extended Concerns**: New persistence logic must extend `storage.ts`. Components must remain pure state-presenters and logic-handlers, separated from storage details.
-- **Storage Key Grouping**: `STORAGE_KEYS` entries must be mentally grouped by domain owner (operations, finance, outreach, business-plan, projects). When adding a new key, you must include an inline comment naming its domain. This grouping defines the table/collection boundaries for the future backend migration.
+- **Extended Concerns**: Components must remain pure state-presenters and logic-handlers, separated from storage details.
+- **Tenant Isolation**: Every database read, insert, update, or delete MUST be scoped by the organization ID.
+
 
 ---
 

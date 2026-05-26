@@ -99,6 +99,17 @@ This inserts the `DEFAULT_ORG_ID` (`00000000-0000-0000-0000-000000000001`) and t
   - `/api/shipments` / `/api/shipments/[id]` (handles nested products and documents relations)
   - `/api/invoices` / `/api/invoices/[id]` (handles nested line items relation)
 
+## Storage Layer (Phase 9a)
+
+TradeFlow's storage layer has been migrated from local-first `localStorage` to API-backed PostgreSQL. 
+
+All reads and writes in the application now go through `src/lib/storage.ts` using the thin, async fetch client `src/lib/api-client.ts`.
+
+- **Asynchronous Signatures**: Every CRUD helper in `storage.ts` returns a `Promise`.
+- **Error Handling**: Network and HTTP status code exceptions are standardly wrapped and thrown as `StorageError`.
+- **Environment Base URL**: Server-side contexts resolve base URLs using `NEXT_PUBLIC_BASE_URL` (absolute URL), while client components use relative endpoints.
+- **LocalStorage Deprecation**: Browser-level `localStorage` references have been completely removed from the runtime codebase.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
