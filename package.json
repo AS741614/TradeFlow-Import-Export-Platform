@@ -15,7 +15,11 @@
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:check": "tsx scripts/db-check.ts",
-    "db:logs": "docker compose logs -f postgres"
+    "db:logs": "docker compose logs -f postgres",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:apply-triggers": "psql $DATABASE_URL < drizzle/triggers/0001_updated_at_triggers.sql"
   },
   "dependencies": {
     "drizzle-orm": "0.38.4",

@@ -30,9 +30,9 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Local Database Setup
+## Local Database Setup & Schema Management
 
-This project uses PostgreSQL for development data. Follow these steps to provision and verify the local database:
+This project uses PostgreSQL for development data and Drizzle ORM for schema management. Follow these steps to provision and verify the local database:
 
 1. **Prerequisites**: Make sure Docker Desktop is installed and running.
 2. **Setup Local Env**: Copy the env template file to your local configuration:
@@ -49,7 +49,26 @@ This project uses PostgreSQL for development data. Follow these steps to provisi
    npm run db:check
    ```
    This script runs a test connection using the `DATABASE_URL` in `.env.local`.
-5. **Stop Container**:
+5. **Manage Database Schema**:
+   - **Generate Migrations**: Whenever you change the schema files under `src/lib/db/schema/`, generate the SQL migration with:
+     ```bash
+     npm run db:generate
+     ```
+   - **Apply Structural Migrations**: Run the Drizzle migrations to update the database tables and columns:
+     ```bash
+     npm run db:migrate
+     ```
+   - **Apply Custom Triggers**: Custom SQL triggers for updating `updated_at` columns automatically are stored in `drizzle/triggers/0001_updated_at_triggers.sql`. Run:
+     ```bash
+     npm run db:apply-triggers
+     ```
+     > [!IMPORTANT]
+     > `drizzle-kit migrate` only handles table and enum structure changes. You must run `npm run db:apply-triggers` separately to apply Postgres triggers. Eventually we may build a proper migration runner that handles both.
+   - **View DB (Drizzle Studio)**: To inspect and edit database rows locally via a UI:
+     ```bash
+     npm run db:studio
+     ```
+6. **Stop Container**:
    ```bash
    npm run db:down
    ```

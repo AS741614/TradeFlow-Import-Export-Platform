@@ -120,6 +120,10 @@ Every agent completion response must include:
 - `src/lib/importers.ts` — CSV and JSON delimiter parsers and data mappings.
 - `src/lib/templateEngine.ts` — Dynamic merge-tokens substitution helper.
 - `src/lib/email.ts` — Sourcing campaigns simulation statistics generator.
+- `src/lib/db/` — Database migration track schemas, client, and migrations.
+  - `src/lib/db/client.ts` — Drizzle Node-Postgres client factory with manual environment loading.
+  - `src/lib/db/schema/index.ts` — Barrel exports of all tables and enums.
+  - `src/lib/db/schema/` — SQL tables and pgEnum declarations partitioned by functional domain (core, operations, finance, outreach, business).
 
 ---
 
