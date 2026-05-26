@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, formatCurrency, formatDate, getStatusColor, nowISO } from '@/lib/utils';
+import { generateId, formatCurrency, formatDate, getStatusColor, nowISO, toISODate } from '@/lib/utils';
 import { CURRENCIES } from '@/lib/constants';
 import type { Invoice, InvoiceStatus, Contact, LineItem } from '@/lib/types';
 
@@ -52,8 +52,8 @@ export default function InvoicesPage() {
     setForm({
       ...EMPTY_FORM,
       number: num,
-      issuedDate: new Date().toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      issuedDate: toISODate(),
+      dueDate: toISODate(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
     setTempItem(EMPTY_LINE_ITEM);
     setShowModal(true);

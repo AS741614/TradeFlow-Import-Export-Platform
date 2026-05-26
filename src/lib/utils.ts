@@ -191,3 +191,18 @@ export function getStatusColor(status: string): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+/**
+ * Safe conversion of dates (Date, string, number) to ISO date format YYYY-MM-DD.
+ * Returns empty string if date is invalid.
+ */
+export function toISODate(input?: Date | string | number): string {
+  const date = input === undefined ? new Date() : new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+  const iso = date.toISOString();
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const datePart = iso.split('T')[0]!;
+  // Reason for non-null assertion: date.toISOString() always contains 'T' and returns a split array
+  return datePart;
+}
+

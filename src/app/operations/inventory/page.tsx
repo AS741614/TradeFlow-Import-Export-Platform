@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatCurrency, getStatusColor, nowISO } from '@/lib/utils';
-import { PRODUCT_CATEGORIES, COUNTRIES, CURRENCIES } from '@/lib/constants';
+import { PRODUCT_CATEGORIES, COUNTRIES, CURRENCIES, DEFAULT_PRODUCT_CATEGORY, DEFAULT_COUNTRY } from '@/lib/constants';
 import type { Product } from '@/lib/types';
 
 // ---- Helpers ----
@@ -18,13 +18,13 @@ const EMPTY_FORM: Omit<Product, 'id' | 'status' | 'createdAt' | 'updatedAt'> = {
   name: '',
   sku: '',
   hsCode: '',
-  category: PRODUCT_CATEGORIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  category: DEFAULT_PRODUCT_CATEGORY,
   quantity: 0,
   reorderLevel: 10,
   unitCost: 0,
   currency: 'USD',
   supplier: '',
-  origin: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  origin: DEFAULT_COUNTRY,
 };
 
 // ---- Component ----

@@ -14,6 +14,7 @@ import {
   titleCase,
   getStatusColor,
   clamp,
+  toISODate,
 } from '../utils';
 
 describe('generateId', () => {
@@ -279,3 +280,35 @@ describe('clamp', () => {
     expect(clamp(15, 1, 10)).toBe(10);
   });
 });
+
+describe('toISODate', () => {
+  it('should format undefined input to today\'s date in YYYY-MM-DD format', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-25T12:00:00Z'));
+    expect(toISODate()).toBe('2026-05-25');
+    vi.useRealTimers();
+  });
+
+  it('should format Date object input to YYYY-MM-DD format', () => {
+    const date = new Date('2026-12-25T00:00:00Z');
+    expect(toISODate(date)).toBe('2026-12-25');
+  });
+
+  it('should format ISO string input to YYYY-MM-DD format', () => {
+    expect(toISODate('2026-07-04T15:30:00Z')).toBe('2026-07-04');
+  });
+
+  it('should format numeric timestamp input to YYYY-MM-DD format', () => {
+    const timestamp = new Date('2026-08-15T00:00:00Z').getTime();
+    expect(toISODate(timestamp)).toBe('2026-08-15');
+  });
+
+  it('should return empty string for invalid date input', () => {
+    expect(toISODate('invalid-date-string')).toBe('');
+  });
+
+  it('should format future date correctly', () => {
+    expect(toISODate('2027-01-01')).toBe('2027-01-01');
+  });
+});
+

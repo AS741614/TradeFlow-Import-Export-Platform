@@ -3,16 +3,16 @@
 import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
-import { COUNTRIES, CARRIERS } from '@/lib/constants';
+import { COUNTRIES, CARRIERS, DEFAULT_COUNTRY, DEFAULT_DESTINATION_COUNTRY, DEFAULT_CARRIER } from '@/lib/constants';
 import type { Shipment, ShipmentStatus, Product, ShipmentProduct } from '@/lib/types';
 
 const STATUS_FLOW: ShipmentStatus[] = ['ordered', 'shipped', 'in-transit', 'customs', 'delivered'];
 
 const EMPTY_FORM = {
   reference: '',
-  origin: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
-  destination: COUNTRIES[1] ?? '', // strict-ts-deferred: assert at constants source in later prompt
-  carrier: CARRIERS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  origin: DEFAULT_COUNTRY,
+  destination: DEFAULT_DESTINATION_COUNTRY,
+  carrier: DEFAULT_CARRIER,
   trackingNumber: '',
   estimatedArrival: '',
   status: 'ordered' as ShipmentStatus,

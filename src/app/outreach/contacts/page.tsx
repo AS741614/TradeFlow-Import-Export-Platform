@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, nowISO, isValidEmail } from '@/lib/utils';
-import { COUNTRIES } from '@/lib/constants';
+import { COUNTRIES, DEFAULT_COUNTRY } from '@/lib/constants';
 import { parseCSV, mapParsedDataToContacts, parseJSONContacts } from '@/lib/importers';
 import type { OutreachContact } from '@/lib/types';
 
@@ -13,7 +13,7 @@ const EMPTY_MANUAL_FORM = {
   email: '',
   company: '',
   phone: '',
-  country: COUNTRIES[0] ?? 'United States', // strict-ts-deferred: assert at constants source in later prompt
+  country: DEFAULT_COUNTRY,
   tags: '',
 };
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, nowISO } from '@/lib/utils';
+import { generateId, nowISO, toISODate } from '@/lib/utils';
 import { runCampaignSimulation } from '@/lib/email';
 import type { Campaign, EmailTemplate, OutreachContact } from '@/lib/types';
 
@@ -38,7 +38,7 @@ export default function CampaignsPage() {
     }
     setWizard({
       ...INITIAL_WIZARD,
-      scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      scheduledAt: toISODate(Date.now() + 24 * 60 * 60 * 1000),
     });
     setShowWizard(true);
   };

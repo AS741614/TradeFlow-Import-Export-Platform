@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
 import { generateId, getStatusColor, nowISO } from '@/lib/utils';
-import { COUNTRIES, INCOTERMS } from '@/lib/constants';
+import { COUNTRIES, INCOTERMS, DEFAULT_COUNTRY, DEFAULT_INCOTERM } from '@/lib/constants';
 import type { Contact, ContactType, ContactStatus } from '@/lib/types';
 
 const EMPTY_FORM = {
@@ -11,11 +11,11 @@ const EMPTY_FORM = {
   contactPerson: '',
   email: '',
   phone: '',
-  country: COUNTRIES[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  country: DEFAULT_COUNTRY,
   address: '',
   type: 'buyer' as ContactType,
   status: 'active' as ContactStatus,
-  tradeTerms: INCOTERMS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+  tradeTerms: DEFAULT_INCOTERM,
   notes: '',
 };
 
@@ -60,7 +60,7 @@ export default function ContactsPage() {
       address: contact.address ?? '',
       type: contact.type,
       status: contact.status,
-      tradeTerms: contact.tradeTerms ?? INCOTERMS[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      tradeTerms: contact.tradeTerms ?? DEFAULT_INCOTERM,
       notes: contact.notes ?? '',
     });
     setShowModal(true);

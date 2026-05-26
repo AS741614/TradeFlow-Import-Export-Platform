@@ -50,7 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
 
 // ---- Product Categories ----
 
-export const PRODUCT_CATEGORIES = [
+export const PRODUCT_CATEGORIES: readonly string[] = [
   'Electronics',
   'Textiles & Apparel',
   'Food & Beverages',
@@ -63,18 +63,36 @@ export const PRODUCT_CATEGORIES = [
   'Consumer Goods',
   'Agricultural Products',
   'Other',
-];
+] as const;
+
+if (PRODUCT_CATEGORIES.length === 0) {
+  throw new Error('PRODUCT_CATEGORIES list must not be empty');
+}
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const DEFAULT_PRODUCT_CATEGORY: string = PRODUCT_CATEGORIES[0]!;
+// Reason for non-null assertion: guarded by length check above
 
 // ---- Countries (common trade partners) ----
 
-export const COUNTRIES = [
+export const COUNTRIES: readonly string[] = [
   'United States', 'China', 'India', 'United Kingdom', 'Germany',
   'Japan', 'South Korea', 'Brazil', 'Canada', 'Australia',
   'France', 'Italy', 'Netherlands', 'Singapore', 'UAE',
   'Turkey', 'Mexico', 'Indonesia', 'Thailand', 'Vietnam',
   'Malaysia', 'Philippines', 'Bangladesh', 'Pakistan', 'South Africa',
   'Saudi Arabia', 'Egypt', 'Nigeria', 'Kenya', 'Sri Lanka',
-];
+] as const;
+
+if (COUNTRIES.length < 2) {
+  throw new Error('COUNTRIES list must contain at least 2 entries');
+}
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const DEFAULT_COUNTRY: string = COUNTRIES[0]!;
+// Reason for non-null assertion: guarded by length check above
+
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const DEFAULT_DESTINATION_COUNTRY: string = COUNTRIES[1]!;
+// Reason for non-null assertion: guarded by length check above
 
 // ---- Currencies ----
 
@@ -93,7 +111,7 @@ export const CURRENCIES = [
 
 // ---- Trade Terms (Incoterms 2020) ----
 
-export const INCOTERMS = [
+export const INCOTERMS: readonly string[] = [
   'EXW - Ex Works',
   'FCA - Free Carrier',
   'CPT - Carriage Paid To',
@@ -105,16 +123,30 @@ export const INCOTERMS = [
   'FOB - Free on Board',
   'CFR - Cost & Freight',
   'CIF - Cost, Insurance & Freight',
-];
+] as const;
+
+if (INCOTERMS.length === 0) {
+  throw new Error('INCOTERMS list must not be empty');
+}
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const DEFAULT_INCOTERM: string = INCOTERMS[0]!;
+// Reason for non-null assertion: guarded by length check above
 
 // ---- Carriers ----
 
-export const CARRIERS = [
+export const CARRIERS: readonly string[] = [
   'Maersk', 'MSC', 'CMA CGM', 'Hapag-Lloyd', 'COSCO',
   'Evergreen', 'ONE', 'Yang Ming', 'ZIM', 'HMM',
   'DHL Freight', 'FedEx Logistics', 'UPS Supply Chain',
   'DB Schenker', 'Kuehne+Nagel', 'Other',
-];
+] as const;
+
+if (CARRIERS.length === 0) {
+  throw new Error('CARRIERS list must not be empty');
+}
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const DEFAULT_CARRIER: string = CARRIERS[0]!;
+// Reason for non-null assertion: guarded by length check above
 
 // ---- Seed Data: Default Tasks for New Business ----
 

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { getItems, addItem, updateItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
-import { generateId, formatDate, getStatusColor, nowISO } from '@/lib/utils';
+import { generateId, formatDate, getStatusColor, nowISO, toISODate } from '@/lib/utils';
 import type { ComplianceItem, Shipment } from '@/lib/types';
 
 const EMPTY_FORM = {
@@ -32,14 +32,14 @@ export default function CompliancePage() {
 
     // If there's no compliance items, let's seed a couple default ones if we have shipments, or just standard ones
     if (storedCompliance.length === 0) {
-      const now = nowISO().split('T')[0] ?? ''; // strict-ts-deferred: assert at constants source in later prompt
+      const now = toISODate(nowISO());
       const defaults: ComplianceItem[] = [
         {
           id: generateId(),
           documentName: 'Export Customs Declaration',
           documentType: 'customs-declaration',
           status: 'pending',
-          requiredBy: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+          requiredBy: toISODate(Date.now() + 15 * 24 * 60 * 60 * 1000),
           notes: 'Required for cargo clearance at local custom port.',
         },
         {
@@ -74,7 +74,7 @@ export default function CompliancePage() {
     setEditingId(null);
     setForm({
       ...EMPTY_FORM,
-      requiredBy: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] ?? '', // strict-ts-deferred: assert at constants source in later prompt
+      requiredBy: toISODate(Date.now() + 10 * 24 * 60 * 60 * 1000),
     });
     setShowModal(true);
   }, []);
