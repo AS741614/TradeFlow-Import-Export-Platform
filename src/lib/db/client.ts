@@ -39,6 +39,7 @@ export function getDb() {
 
   pool = new Pool({
     connectionString,
+    max: 10, // Reused across route handlers, limit to 10 connections
   });
 
   db = drizzle(pool, { schema });

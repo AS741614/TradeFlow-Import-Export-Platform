@@ -73,6 +73,32 @@ This project uses PostgreSQL for development data and Drizzle ORM for schema man
    npm run db:down
    ```
 
+## API Routes & Validation (Phase 8a)
+
+This project implements standardized REST API endpoints for operations business entities under `src/app/api/`. These routes utilize Drizzle ORM for database queries and Zod for request body validation.
+
+### Seeding Development Data
+Before running API integration tests or developing features, seed the database with the default tenant organization and default user:
+```bash
+npm run db:seed
+```
+This inserts the `DEFAULT_ORG_ID` (`00000000-0000-0000-0000-000000000001`) and the `DEFAULT_USER_ID` (`00000000-0000-0000-0000-000000000002`) into the database.
+
+### API Specifications
+- **Format**: All route responses conform to `{ data: T | T[] }` or `{ error: string }`.
+- **Status Codes**:
+  - `200 OK`: Successful read, update, or deletion.
+  - `201 Created`: Successful creation.
+  - `400 Bad Request`: Validation failure.
+  - `404 Not Found`: Record not found.
+  - `500 Server Error`: Database or execution error.
+- **Operations Routes (Phase 8a)**:
+  - `/api/contacts` / `/api/contacts/[id]`
+  - `/api/products` / `/api/products/[id]`
+  - `/api/compliance` / `/api/compliance/[id]`
+  - `/api/shipments` / `/api/shipments/[id]` (handles nested products and documents relations)
+  - `/api/invoices` / `/api/invoices/[id]` (handles nested line items relation)
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

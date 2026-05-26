@@ -132,3 +132,14 @@ Every agent completion response must include:
 - `.cursorrules` — Compressed workspace instructions for Cursor IDE.
 - `README.md` — Developer onboarding overview.
 - `.env.example` — Template defining local PostgreSQL environment variables.
+
+---
+
+## Section 12: API Conventions and Tenancy Safeguards (Phase 8a)
+- **API Route Placement**: All REST endpoints live under `src/app/api/[entity]/` and `src/app/api/[entity]/[id]/`.
+- **Validation**: All request payloads must be validated using Zod schemas defined under `src/lib/db/validation/`.
+- **Tenant Isolation**: Every database read, insert, update, or delete MUST be scoped by the organization ID (`DEFAULT_ORG_ID` for now). Ensure `withTenant` from `src/lib/db/queries/base.ts` is applied to all WHERE conditions.
+- **Deletions Auditing**: Standard DELETE operations must be executed inside a Drizzle transaction where:
+  1. The row to be deleted is selected first.
+  2. A snapshot of the row is inserted into the `deletion_logs` table (using the `deleteWithLog` helper).
+  3. The target row is hard deleted from its table.

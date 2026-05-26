@@ -19,14 +19,22 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:apply-triggers": "psql $DATABASE_URL < drizzle/triggers/0001_updated_at_triggers.sql"
+    "db:apply-triggers": "psql $DATABASE_URL < drizzle/triggers/0001_updated_at_triggers.sql",
+    "db:seed": "tsx scripts/seed-default-org.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.38.4",
+    "drizzle-zod": "0.8.3",
     "next": "16.2.6",
     "pg": "8.13.1",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "3.25.76"
+  },
+  "overrides": {
+    "zod-validation-error": {
+      "zod": "^4.0.0"
+    }
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
