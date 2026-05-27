@@ -2,27 +2,26 @@ import { getDb } from '../client';
 import { tasks } from '../schema';
 import { eq } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
-import { DEFAULT_ORG_ID } from '../constants';
 import type { InsertTaskInput, UpdateTaskInput } from '../validation/tasks';
 
-export async function getTasks() {
+export async function getTasks(orgId: string) {
   const db = getDb();
-  return db.select().from(tasks).where(withTenant(tasks));
+  return db.select().from(tasks).where(withTenant(tasks, orgId));
 }
 
-export async function getTaskById(id: string) {
+export async function getTaskById(orgId: string, id: string) {
   const db = getDb();
   const rows = await db.select().from(tasks).where(
-    withTenant(tasks, eq(tasks.id, id))
+    withTenant(tasks, orgId, eq(tasks.id, id))
   );
   return rows[0] ?? null;
 }
 
-export async function createTask(data: InsertTaskInput) {
+export async function createTask(orgId: string, data: InsertTaskInput) {
   const db = getDb();
   const rows = await db.insert(tasks).values({
     ...data,
-    orgId: DEFAULT_ORG_ID,
+    orgId,
   }).returning();
   const inserted = rows[0];
   if (!inserted) {
@@ -31,31 +30,32 @@ export async function createTask(data: InsertTaskInput) {
   return inserted;
 }
 
-export async function updateTask(id: string, data: UpdateTaskInput) {
+export async function updateTask(orgId: string, id: string, data: UpdateTaskInput) {
   const db = getDb();
   const rows = await db.update(tasks)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(withTenant(tasks, eq(tasks.id, id)))
+    .where(withTenant(tasks, orgId, eq(tasks.id, id)))
     .returning();
   return rows[0] ?? null;
 }
 
-export async function deleteTask(id: string, reason?: string) {
+export async function deleteTask(orgId: string, id: string, userId: string, reason?: string) {
   return deleteWithLog(
     'tasks',
     id,
+    userId,
     async (tx) => {
       const rows = await tx.select().from(tasks).where(
-        withTenant(tasks, eq(tasks.id, id))
+        withTenant(tasks, orgId, eq(tasks.id, id))
       );
       return rows[0] ?? null;
     },
     async (tx) => {
       await tx.delete(tasks).where(
-        withTenant(tasks, eq(tasks.id, id))
+        withTenant(tasks, orgId, eq(tasks.id, id))
       );
     },
     reason

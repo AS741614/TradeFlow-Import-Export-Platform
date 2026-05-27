@@ -2,12 +2,11 @@ import { getDb } from '../client';
 import { campaigns, campaignContacts } from '../schema';
 import { eq } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
-import { DEFAULT_ORG_ID } from '../constants';
 import type { InsertCampaignInput, UpdateCampaignInput } from '../validation/campaigns';
 
-export async function getCampaigns() {
+export async function getCampaigns(orgId: string) {
   const db = getDb();
-  const campaignRows = await db.select().from(campaigns).where(withTenant(campaigns));
+  const campaignRows = await db.select().from(campaigns).where(withTenant(campaigns, orgId));
   
   const results = [];
   for (const campaign of campaignRows) {
@@ -22,10 +21,10 @@ export async function getCampaigns() {
   return results;
 }
 
-export async function getCampaignById(id: string) {
+export async function getCampaignById(orgId: string, id: string) {
   const db = getDb();
   const campaignRows = await db.select().from(campaigns).where(
-    withTenant(campaigns, eq(campaigns.id, id))
+    withTenant(campaigns, orgId, eq(campaigns.id, id))
   );
   const campaign = campaignRows[0] ?? null;
   if (!campaign) return null;
@@ -39,14 +38,14 @@ export async function getCampaignById(id: string) {
   };
 }
 
-export async function createCampaign(data: InsertCampaignInput) {
+export async function createCampaign(orgId: string, data: InsertCampaignInput) {
   const db = getDb();
   const { contactIds, ...campaignData } = data;
   
   return db.transaction(async (tx) => {
     const rows = await tx.insert(campaigns).values({
       ...campaignData,
-      orgId: DEFAULT_ORG_ID,
+      orgId,
     }).returning();
     
     const campaign = rows[0];
@@ -71,7 +70,7 @@ export async function createCampaign(data: InsertCampaignInput) {
   });
 }
 
-export async function updateCampaign(id: string, data: UpdateCampaignInput) {
+export async function updateCampaign(orgId: string, id: string, data: UpdateCampaignInput) {
   const db = getDb();
   const { contactIds, ...campaignData } = data;
   
@@ -81,7 +80,7 @@ export async function updateCampaign(id: string, data: UpdateCampaignInput) {
         ...campaignData,
         updatedAt: new Date().toISOString(),
       })
-      .where(withTenant(campaigns, eq(campaigns.id, id)))
+      .where(withTenant(campaigns, orgId, eq(campaigns.id, id)))
       .returning();
     
     const campaign = rows[0] ?? null;
@@ -114,13 +113,14 @@ export async function updateCampaign(id: string, data: UpdateCampaignInput) {
   });
 }
 
-export async function deleteCampaign(id: string, reason?: string) {
+export async function deleteCampaign(orgId: string, id: string, userId: string, reason?: string) {
   return deleteWithLog(
     'campaigns',
     id,
+    userId,
     async (tx) => {
       const rows = await tx.select().from(campaigns).where(
-        withTenant(campaigns, eq(campaigns.id, id))
+        withTenant(campaigns, orgId, eq(campaigns.id, id))
       );
       const campaign = rows[0] ?? null;
       if (!campaign) return null;
@@ -136,7 +136,7 @@ export async function deleteCampaign(id: string, reason?: string) {
     },
     async (tx) => {
       await tx.delete(campaigns).where(
-        withTenant(campaigns, eq(campaigns.id, id))
+        withTenant(campaigns, orgId, eq(campaigns.id, id))
       );
     },
     reason

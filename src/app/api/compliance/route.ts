@@ -1,13 +1,17 @@
-// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getComplianceItems, createComplianceItem } from '@/lib/db/queries/compliance';
 import { insertComplianceSchema } from '@/lib/db/validation/compliance';
+import { throwIfNotAuthenticated } from '@/lib/auth-server';
 
 export async function GET() {
   try {
-    const list = await getComplianceItems();
+    const session = await throwIfNotAuthenticated();
+    const list = await getComplianceItems(session.orgId);
     return NextResponse.json({ data: list });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : 'Unknown database error';
     return NextResponse.json({ error: message }, { status: 500 });
   }
@@ -15,14 +19,18 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await throwIfNotAuthenticated();
     const body: unknown = await req.json();
     const parsed = insertComplianceSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
-    const record = await createComplianceItem(parsed.data);
+    const record = await createComplianceItem(session.orgId, parsed.data);
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const message = error instanceof Error ? error.message : 'Unknown database error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

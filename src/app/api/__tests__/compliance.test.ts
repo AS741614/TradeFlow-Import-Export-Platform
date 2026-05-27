@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../compliance/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../compliance/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Compliance API Integration Tests', () => {
   const db = getDb();
@@ -14,22 +24,10 @@ describe('Compliance API Integration Tests', () => {
     // Clear test tables in dependency order
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.complianceItems);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    // Seed default org and user
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -38,13 +36,21 @@ describe('Compliance API Integration Tests', () => {
     await db.delete(dbSchema.complianceItems);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/compliance');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -60,7 +66,7 @@ describe('Compliance API Integration Tests', () => {
       notes: 'Needs review by broker',
     };
 
-    const req = new NextRequest('http://localhost/api/compliance', {
+    const req = createAuthenticatedRequest('http://localhost/api/compliance', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -69,7 +75,7 @@ describe('Compliance API Integration Tests', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.documentName).toBe('Customs Declaration A');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -79,7 +85,7 @@ describe('Compliance API Integration Tests', () => {
       requiredBy: 'not-a-date', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/compliance', {
+    const req = createAuthenticatedRequest('http://localhost/api/compliance', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -92,7 +98,7 @@ describe('Compliance API Integration Tests', () => {
 
   it('should retrieve a single compliance item by id', async () => {
     const insertedResult = await db.insert(dbSchema.complianceItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       documentName: 'Bill of Lading Doc',
       documentType: 'bill-of-lading',
       status: 'submitted',
@@ -100,7 +106,7 @@ describe('Compliance API Integration Tests', () => {
     }).returning();
     const inserted = insertedResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/compliance/${inserted.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/compliance/${inserted.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: inserted.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -110,14 +116,14 @@ describe('Compliance API Integration Tests', () => {
 
   it('should return 404 if compliance item does not exist', async () => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
-    const req = new NextRequest(`http://localhost/api/compliance/${fakeId}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/compliance/${fakeId}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: fakeId }) });
     expect(res.status).toBe(404);
   });
 
   it('should patch update a compliance item', async () => {
     const insertedResult = await db.insert(dbSchema.complianceItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       documentName: 'Insurance Certificate',
       documentType: 'insurance',
       status: 'pending',
@@ -130,7 +136,7 @@ describe('Compliance API Integration Tests', () => {
       notes: 'Approved by safety manager',
     };
 
-    const req = new NextRequest(`http://localhost/api/compliance/${inserted.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/compliance/${inserted.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -145,7 +151,7 @@ describe('Compliance API Integration Tests', () => {
 
   it('should delete a compliance item and write to deletion_logs', async () => {
     const insertedResult = await db.insert(dbSchema.complianceItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       documentName: 'Packing List File',
       documentType: 'packing-list',
       status: 'rejected',
@@ -153,7 +159,7 @@ describe('Compliance API Integration Tests', () => {
     }).returning();
     const inserted = insertedResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/compliance/${inserted.id}?reason=ObsoleteDoc`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/compliance/${inserted.id}?reason=ObsoleteDoc`, {
       method: 'DELETE',
     });
 

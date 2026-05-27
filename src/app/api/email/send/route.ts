@@ -1,9 +1,10 @@
-// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextResponse } from 'next/server';
 import { runCampaignSimulation } from '@/lib/email';
+import { throwIfNotAuthenticated } from '@/lib/auth-server';
 
 export async function POST(request: Request) {
   try {
+    await throwIfNotAuthenticated();
     const body = (await request.json()) as Record<string, unknown>;
     const campaignId = body.campaignId;
 
@@ -24,6 +25,9 @@ export async function POST(request: Request) {
       campaignId,
     });
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('Email API Route Error:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

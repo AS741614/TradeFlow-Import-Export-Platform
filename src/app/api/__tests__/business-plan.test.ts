@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../business-plan/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../business-plan/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Business Plan API Integration Tests', () => {
   const db = getDb();
@@ -13,21 +23,10 @@ describe('Business Plan API Integration Tests', () => {
   beforeEach(async () => {
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.businessPlanSections);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +34,21 @@ describe('Business Plan API Integration Tests', () => {
     await db.delete(dbSchema.businessPlanSections);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/business-plan');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -55,7 +62,7 @@ describe('Business Plan API Integration Tests', () => {
       sortOrder: 1,
     };
 
-    const req = new NextRequest('http://localhost/api/business-plan', {
+    const req = createAuthenticatedRequest('http://localhost/api/business-plan', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -66,7 +73,7 @@ describe('Business Plan API Integration Tests', () => {
     expect(body.data.title).toBe('Executive Summary');
     expect(body.data.content).toBe('This is the executive summary description.');
     expect(body.data.sortOrder).toBe(1);
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -77,7 +84,7 @@ describe('Business Plan API Integration Tests', () => {
       sortOrder: 1.5, // invalid (not integer)
     };
 
-    const req = new NextRequest('http://localhost/api/business-plan', {
+    const req = createAuthenticatedRequest('http://localhost/api/business-plan', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -90,14 +97,14 @@ describe('Business Plan API Integration Tests', () => {
 
   it('should retrieve a single business plan section by id', async () => {
     const sectionResult = await db.insert(dbSchema.businessPlanSections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       title: 'Market Analysis',
       content: 'Detailed analysis of import export trend',
       sortOrder: 2,
     }).returning();
     const section = sectionResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/business-plan/${section.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/business-plan/${section.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: section.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -107,7 +114,7 @@ describe('Business Plan API Integration Tests', () => {
 
   it('should patch update a business plan section', async () => {
     const sectionResult = await db.insert(dbSchema.businessPlanSections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       title: 'Financial Plan',
       content: 'Projections for Q3 and Q4',
       sortOrder: 3,
@@ -119,7 +126,7 @@ describe('Business Plan API Integration Tests', () => {
       sortOrder: 4,
     };
 
-    const req = new NextRequest(`http://localhost/api/business-plan/${section.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/business-plan/${section.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -133,7 +140,7 @@ describe('Business Plan API Integration Tests', () => {
 
   it('should return 404 when updating non-existent business plan section', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/business-plan/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/business-plan/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ title: 'New section title' }),
     });
@@ -144,14 +151,14 @@ describe('Business Plan API Integration Tests', () => {
 
   it('should delete a business plan section and write audit record to deletion_logs', async () => {
     const sectionResult = await db.insert(dbSchema.businessPlanSections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       title: 'Operations Plan Obsolete',
       content: 'Operational workflow details',
       sortOrder: 5,
     }).returning();
     const section = sectionResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/business-plan/${section.id}?reason=Merged%20with%20market%20plan`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/business-plan/${section.id}?reason=Merged%20with%20market%20plan`, {
       method: 'DELETE',
     });
 

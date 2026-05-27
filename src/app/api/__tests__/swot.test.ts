@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../swot/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../swot/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('SWOT API Integration Tests', () => {
   const db = getDb();
@@ -13,21 +23,10 @@ describe('SWOT API Integration Tests', () => {
   beforeEach(async () => {
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.swotItems);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +34,21 @@ describe('SWOT API Integration Tests', () => {
     await db.delete(dbSchema.swotItems);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/swot');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -54,7 +61,7 @@ describe('SWOT API Integration Tests', () => {
       category: 'strength',
     };
 
-    const req = new NextRequest('http://localhost/api/swot', {
+    const req = createAuthenticatedRequest('http://localhost/api/swot', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -64,7 +71,7 @@ describe('SWOT API Integration Tests', () => {
     const body = await res.json();
     expect(body.data.text).toBe('Experienced logistics team');
     expect(body.data.category).toBe('strength');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -74,7 +81,7 @@ describe('SWOT API Integration Tests', () => {
       category: 'invalid-category', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/swot', {
+    const req = createAuthenticatedRequest('http://localhost/api/swot', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -87,13 +94,13 @@ describe('SWOT API Integration Tests', () => {
 
   it('should retrieve a single SWOT item by id', async () => {
     const swotResult = await db.insert(dbSchema.swotItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       text: 'High dependency on third-party suppliers',
       category: 'weakness',
     }).returning();
     const swot = swotResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/swot/${swot.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/swot/${swot.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: swot.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -103,7 +110,7 @@ describe('SWOT API Integration Tests', () => {
 
   it('should patch update a SWOT item', async () => {
     const swotResult = await db.insert(dbSchema.swotItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       text: 'Expanding into South American market',
       category: 'opportunity',
     }).returning();
@@ -113,7 +120,7 @@ describe('SWOT API Integration Tests', () => {
       text: 'Expanding into LATAM market',
     };
 
-    const req = new NextRequest(`http://localhost/api/swot/${swot.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/swot/${swot.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -126,7 +133,7 @@ describe('SWOT API Integration Tests', () => {
 
   it('should return 404 when updating non-existent SWOT item', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/swot/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/swot/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ text: 'New text' }),
     });
@@ -137,13 +144,13 @@ describe('SWOT API Integration Tests', () => {
 
   it('should delete a SWOT item and write audit record to deletion_logs', async () => {
     const swotResult = await db.insert(dbSchema.swotItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       text: 'New trade tariffs from key partners',
       category: 'threat',
     }).returning();
     const swot = swotResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/swot/${swot.id}?reason=Obsolete%20threat`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/swot/${swot.id}?reason=Obsolete%20threat`, {
       method: 'DELETE',
     });
 

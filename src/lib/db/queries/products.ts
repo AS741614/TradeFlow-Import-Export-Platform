@@ -2,27 +2,26 @@ import { getDb } from '../client';
 import { products } from '../schema';
 import { eq } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
-import { DEFAULT_ORG_ID } from '../constants';
 import type { InsertProductInput, UpdateProductInput } from '../validation/products';
 
-export async function getProducts() {
+export async function getProducts(orgId: string) {
   const db = getDb();
-  return db.select().from(products).where(withTenant(products));
+  return db.select().from(products).where(withTenant(products, orgId));
 }
 
-export async function getProductById(id: string) {
+export async function getProductById(orgId: string, id: string) {
   const db = getDb();
   const rows = await db.select().from(products).where(
-    withTenant(products, eq(products.id, id))
+    withTenant(products, orgId, eq(products.id, id))
   );
   return rows[0] ?? null;
 }
 
-export async function createProduct(data: InsertProductInput) {
+export async function createProduct(orgId: string, data: InsertProductInput) {
   const db = getDb();
   const rows = await db.insert(products).values({
     ...data,
-    orgId: DEFAULT_ORG_ID,
+    orgId,
   }).returning();
   const inserted = rows[0];
   if (!inserted) {
@@ -31,31 +30,32 @@ export async function createProduct(data: InsertProductInput) {
   return inserted;
 }
 
-export async function updateProduct(id: string, data: UpdateProductInput) {
+export async function updateProduct(orgId: string, id: string, data: UpdateProductInput) {
   const db = getDb();
   const rows = await db.update(products)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(withTenant(products, eq(products.id, id)))
+    .where(withTenant(products, orgId, eq(products.id, id)))
     .returning();
   return rows[0] ?? null;
 }
 
-export async function deleteProduct(id: string, reason?: string) {
+export async function deleteProduct(orgId: string, id: string, userId: string, reason?: string) {
   return deleteWithLog(
     'products',
     id,
+    userId,
     async (tx) => {
       const rows = await tx.select().from(products).where(
-        withTenant(products, eq(products.id, id))
+        withTenant(products, orgId, eq(products.id, id))
       );
       return rows[0] ?? null;
     },
     async (tx) => {
       await tx.delete(products).where(
-        withTenant(products, eq(products.id, id))
+        withTenant(products, orgId, eq(products.id, id))
       );
     },
     reason

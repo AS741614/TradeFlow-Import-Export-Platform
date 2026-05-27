@@ -17,7 +17,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verificationTokensTable: verificationTokens,
   }),
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
   },
   providers: [
     ...authConfig.providers,
@@ -54,14 +54,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    ...authConfig.callbacks,
-    session({ session, user }) {
-      session.user.id = user.id;
-      // Inject orgId and role from database user record into session
-      const customUser = user as unknown as { orgId: string; role: string };
+    jwt({ token, user }) {
+      // On sign-in, user object is present; persist orgId/role into token
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (user) {
+        const customUser = user as unknown as { id: string; orgId: string; role: string };
+        token.userId = customUser.id;
+        token.orgId = customUser.orgId;
+        token.role = customUser.role;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      // On every getSession() call, read from token (JWT) not from user (DB row)
       const customSessionUser = session.user as unknown as { id: string; orgId: string; role: string };
-      customSessionUser.orgId = customUser.orgId;
-      customSessionUser.role = customUser.role;
+      customSessionUser.id = (token.userId as string | undefined) ?? '';
+      customSessionUser.orgId = (token.orgId as string | undefined) ?? '';
+      customSessionUser.role = (token.role as string | undefined) ?? 'user';
       return session;
     },
   },

@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../financial-projections/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../financial-projections/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Financial Projections API Integration Tests', () => {
   const db = getDb();
@@ -13,21 +23,10 @@ describe('Financial Projections API Integration Tests', () => {
   beforeEach(async () => {
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.financialProjections);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +34,21 @@ describe('Financial Projections API Integration Tests', () => {
     await db.delete(dbSchema.financialProjections);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/financial-projections');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -57,7 +64,7 @@ describe('Financial Projections API Integration Tests', () => {
       currency: 'USD',
     };
 
-    const req = new NextRequest('http://localhost/api/financial-projections', {
+    const req = createAuthenticatedRequest('http://localhost/api/financial-projections', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -67,7 +74,7 @@ describe('Financial Projections API Integration Tests', () => {
     const body = await res.json();
     expect(body.data.month).toBe('January 2026');
     expect(body.data.revenue).toBe(500000);
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -79,7 +86,7 @@ describe('Financial Projections API Integration Tests', () => {
       currency: 'CADCAD', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/financial-projections', {
+    const req = createAuthenticatedRequest('http://localhost/api/financial-projections', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -92,7 +99,7 @@ describe('Financial Projections API Integration Tests', () => {
 
   it('should retrieve a single projection by id', async () => {
     const projResult = await db.insert(dbSchema.financialProjections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       month: 'February 2026',
       revenue: 600000,
       expenses: 400000,
@@ -101,7 +108,7 @@ describe('Financial Projections API Integration Tests', () => {
     }).returning();
     const proj = projResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/financial-projections/${proj.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/financial-projections/${proj.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: proj.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -111,7 +118,7 @@ describe('Financial Projections API Integration Tests', () => {
 
   it('should patch update a projection', async () => {
     const projResult = await db.insert(dbSchema.financialProjections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       month: 'March 2026',
       revenue: 700000,
       expenses: 500000,
@@ -125,7 +132,7 @@ describe('Financial Projections API Integration Tests', () => {
       profit: 250000,
     };
 
-    const req = new NextRequest(`http://localhost/api/financial-projections/${proj.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/financial-projections/${proj.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -139,7 +146,7 @@ describe('Financial Projections API Integration Tests', () => {
 
   it('should return 404 when updating non-existent projection', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/financial-projections/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/financial-projections/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ month: 'April 2026' }),
     });
@@ -150,7 +157,7 @@ describe('Financial Projections API Integration Tests', () => {
 
   it('should delete a projection and write audit record to deletion_logs', async () => {
     const projResult = await db.insert(dbSchema.financialProjections).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       month: 'April 2026',
       revenue: 800000,
       expenses: 600000,
@@ -159,7 +166,7 @@ describe('Financial Projections API Integration Tests', () => {
     }).returning();
     const proj = projResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/financial-projections/${proj.id}?reason=Stale%20data`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/financial-projections/${proj.id}?reason=Stale%20data`, {
       method: 'DELETE',
     });
 

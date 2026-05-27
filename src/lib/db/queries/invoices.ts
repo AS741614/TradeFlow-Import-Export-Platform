@@ -3,10 +3,9 @@ import { invoices, invoiceLineItems, contacts } from '../schema';
 import { eq } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
-import { DEFAULT_ORG_ID } from '../constants';
 import type { InsertInvoiceInput, UpdateInvoiceInput } from '../validation/invoices';
 
-export async function getInvoices() {
+export async function getInvoices(orgId: string) {
   const db = getDb();
 
   // 1. Fetch invoices joined with contacts to resolve contactName
@@ -17,7 +16,7 @@ export async function getInvoices() {
     })
     .from(invoices)
     .leftJoin(contacts, eq(invoices.contactId, contacts.id))
-    .where(withTenant(invoices));
+    .where(withTenant(invoices, orgId));
 
   // 2. Fetch line items for each invoice
   const result = [];
@@ -37,7 +36,7 @@ export async function getInvoices() {
   return result;
 }
 
-export async function getInvoiceById(id: string, tx?: TxClient) {
+export async function getInvoiceById(orgId: string, id: string, tx?: TxClient) {
   const client = tx ?? getDb();
 
   const rows = await client
@@ -47,7 +46,7 @@ export async function getInvoiceById(id: string, tx?: TxClient) {
     })
     .from(invoices)
     .leftJoin(contacts, eq(invoices.contactId, contacts.id))
-    .where(withTenant(invoices, eq(invoices.id, id)));
+    .where(withTenant(invoices, orgId, eq(invoices.id, id)));
 
   const row = rows[0];
   if (!row) return null;
@@ -64,7 +63,7 @@ export async function getInvoiceById(id: string, tx?: TxClient) {
   };
 }
 
-export async function createInvoice(data: InsertInvoiceInput) {
+export async function createInvoice(orgId: string, data: InsertInvoiceInput) {
   const db = getDb();
   const { lineItems: lineItemsData, ...invoiceFields } = data;
 
@@ -72,7 +71,7 @@ export async function createInvoice(data: InsertInvoiceInput) {
     // 1. Insert invoice
     const invoiceResult = await tx.insert(invoices).values({
       ...invoiceFields,
-      orgId: DEFAULT_ORG_ID,
+      orgId,
     }).returning();
     const invoice = invoiceResult[0];
     if (!invoice) {
@@ -105,7 +104,7 @@ export async function createInvoice(data: InsertInvoiceInput) {
   });
 }
 
-export async function updateInvoice(id: string, data: UpdateInvoiceInput) {
+export async function updateInvoice(orgId: string, id: string, data: UpdateInvoiceInput) {
   const db = getDb();
   const { lineItems: lineItemsData, ...invoiceFields } = data;
 
@@ -113,7 +112,7 @@ export async function updateInvoice(id: string, data: UpdateInvoiceInput) {
     // 1. Update invoice fields
     const invoiceResult = await tx.update(invoices)
       .set(invoiceFields)
-      .where(withTenant(invoices, eq(invoices.id, id)))
+      .where(withTenant(invoices, orgId, eq(invoices.id, id)))
       .returning();
     const invoice = invoiceResult[0];
 
@@ -136,23 +135,24 @@ export async function updateInvoice(id: string, data: UpdateInvoiceInput) {
     }
 
     // Fetch updated invoice using tx
-    const updated = await getInvoiceById(id, tx);
+    const updated = await getInvoiceById(orgId, id, tx);
     return updated;
   });
 }
 
-export async function deleteInvoice(id: string, reason?: string) {
+export async function deleteInvoice(orgId: string, id: string, userId: string, reason?: string) {
   return deleteWithLog(
     'invoices',
     id,
+    userId,
     async (tx: TxClient) => {
-      const invoice = await getInvoiceById(id, tx);
+      const invoice = await getInvoiceById(orgId, id, tx);
       return invoice;
     },
     async (tx: TxClient) => {
       // Cascade delete handles invoice_line_items automatically
       await tx.delete(invoices).where(
-        withTenant(invoices, eq(invoices.id, id))
+        withTenant(invoices, orgId, eq(invoices.id, id))
       );
     },
     reason

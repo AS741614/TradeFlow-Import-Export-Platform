@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../campaigns/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../campaigns/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+  TEST_USER_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Campaigns API Integration Tests', () => {
   const db = getDb();
@@ -22,21 +33,11 @@ describe('Campaigns API Integration Tests', () => {
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
 
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    await seedTestAuth();
+    mockAuthSession();
 
     const templateRes = await db.insert(dbSchema.emailTemplates).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Newsletter',
       category: 'introduction',
       subject: 'Weekly Updates',
@@ -46,7 +47,7 @@ describe('Campaigns API Integration Tests', () => {
     templateId = templateRes[0]!.id;
 
     const contactRes1 = await db.insert(dbSchema.outreachContacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       firstName: 'Alice',
       lastName: 'Smith',
       email: 'alice@example.com',
@@ -58,7 +59,7 @@ describe('Campaigns API Integration Tests', () => {
     contactId1 = contactRes1[0]!.id;
 
     const contactRes2 = await db.insert(dbSchema.outreachContacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       firstName: 'Bob',
       lastName: 'Jones',
       email: 'bob@example.com',
@@ -78,13 +79,21 @@ describe('Campaigns API Integration Tests', () => {
     await db.delete(dbSchema.outreachContacts);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/campaigns');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -102,7 +111,7 @@ describe('Campaigns API Integration Tests', () => {
       contactIds: [contactId1, contactId2],
     };
 
-    const req = new NextRequest('http://localhost/api/campaigns', {
+    const req = createAuthenticatedRequest('http://localhost/api/campaigns', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -111,7 +120,7 @@ describe('Campaigns API Integration Tests', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.name).toBe('Summer Outreach');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
     expect(body.data.contactIds).toEqual([contactId1, contactId2]);
 
@@ -130,7 +139,7 @@ describe('Campaigns API Integration Tests', () => {
       subjectLineA: '', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/campaigns', {
+    const req = createAuthenticatedRequest('http://localhost/api/campaigns', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -143,7 +152,7 @@ describe('Campaigns API Integration Tests', () => {
 
   it('should retrieve a single campaign by id with contactIds populated', async () => {
     const campaignRes = await db.insert(dbSchema.campaigns).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Winter Promo',
       templateId,
       status: 'scheduled',
@@ -160,7 +169,7 @@ describe('Campaigns API Integration Tests', () => {
       status: 'pending',
     });
 
-    const req = new NextRequest(`http://localhost/api/campaigns/${campaign.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/campaigns/${campaign.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: campaign.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -171,7 +180,7 @@ describe('Campaigns API Integration Tests', () => {
 
   it('should patch update a campaign and rewrite junction records', async () => {
     const campaignRes = await db.insert(dbSchema.campaigns).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Drip Email Campaign',
       templateId,
       status: 'sending',
@@ -193,7 +202,7 @@ describe('Campaigns API Integration Tests', () => {
       contactIds: [contactId2], // replaces contactId1 with contactId2
     };
 
-    const req = new NextRequest(`http://localhost/api/campaigns/${campaign.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/campaigns/${campaign.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -211,7 +220,7 @@ describe('Campaigns API Integration Tests', () => {
 
   it('should return 404 when updating non-existent campaign', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/campaigns/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/campaigns/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ name: 'Updated Campaign' }),
     });
@@ -222,7 +231,7 @@ describe('Campaigns API Integration Tests', () => {
 
   it('should delete a campaign, cascade junction rows, and record contactIds in deletion_logs', async () => {
     const campaignRes = await db.insert(dbSchema.campaigns).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'To Be Deleted Campaign',
       templateId,
       status: 'paused',
@@ -237,7 +246,7 @@ describe('Campaigns API Integration Tests', () => {
       { campaignId: campaign.id, contactId: contactId2, status: 'pending' },
     ]);
 
-    const req = new NextRequest(`http://localhost/api/campaigns/${campaign.id}?reason=End%20of%20quarter`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/campaigns/${campaign.id}?reason=End%20of%20quarter`, {
       method: 'DELETE',
     });
 
@@ -260,5 +269,6 @@ describe('Campaigns API Integration Tests', () => {
     expect((log.deletedData as any).name).toBe('To Be Deleted Campaign');
     expect((log.deletedData as any).contactIds).toEqual([contactId1, contactId2]); // Saved successfully!
     expect(log.reason).toBe('End of quarter');
+    expect(log.deletedByUserId).toBe(TEST_USER_ID);
   });
 });

@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../shipments/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../shipments/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Shipments API Integration Tests', () => {
   const db = getDb();
@@ -21,22 +31,12 @@ describe('Shipments API Integration Tests', () => {
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
 
-    // Seed default org and user
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
 
     const productsResult = await db.insert(dbSchema.products).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Shipment Item',
       sku: 'SKU-SHIP',
       hsCode: '9999.99.99',
@@ -62,13 +62,21 @@ describe('Shipments API Integration Tests', () => {
     await db.delete(dbSchema.products);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/shipments');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -98,7 +106,7 @@ describe('Shipments API Integration Tests', () => {
       ],
     };
 
-    const req = new NextRequest('http://localhost/api/shipments', {
+    const req = createAuthenticatedRequest('http://localhost/api/shipments', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -116,7 +124,7 @@ describe('Shipments API Integration Tests', () => {
 
   it('should retrieve a single shipment with relations by id', async () => {
     const shipmentsResult = await db.insert(dbSchema.shipments).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       reference: 'SHIP-SINGLE',
       origin: 'Montreal, CA',
       destination: 'London, UK',
@@ -139,7 +147,7 @@ describe('Shipments API Integration Tests', () => {
       status: 'approved',
     });
 
-    const req = new NextRequest(`http://localhost/api/shipments/${shipment.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/shipments/${shipment.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: shipment.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -151,7 +159,7 @@ describe('Shipments API Integration Tests', () => {
 
   it('should patch update a shipment, replacing relations', async () => {
     const shipmentsResult = await db.insert(dbSchema.shipments).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       reference: 'SHIP-PATCH',
       origin: 'Montreal, CA',
       destination: 'London, UK',
@@ -179,7 +187,7 @@ describe('Shipments API Integration Tests', () => {
       ],
     };
 
-    const req = new NextRequest(`http://localhost/api/shipments/${shipment.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/shipments/${shipment.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -195,7 +203,7 @@ describe('Shipments API Integration Tests', () => {
 
   it('should delete a shipment and write full cascade snapshot to deletion_logs', async () => {
     const shipmentsResult = await db.insert(dbSchema.shipments).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       reference: 'SHIP-DELETE',
       origin: 'Halifax, CA',
       destination: 'Rotterdam, NL',
@@ -211,7 +219,7 @@ describe('Shipments API Integration Tests', () => {
       quantity: 200,
     });
 
-    const req = new NextRequest(`http://localhost/api/shipments/${shipment.id}?reason=Cancelled`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/shipments/${shipment.id}?reason=Cancelled`, {
       method: 'DELETE',
     });
 

@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../invoices/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../invoices/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Invoices API Integration Tests', () => {
   const db = getDb();
@@ -17,26 +27,14 @@ describe('Invoices API Integration Tests', () => {
     await db.delete(dbSchema.invoiceLineItems);
     await db.delete(dbSchema.invoices);
     await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    // Seed default org and user
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
 
     // Create a contact for relationship testing
     const contactsResult = await db.insert(dbSchema.contacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       company: 'Invoice Client Corp',
       contactPerson: 'Alice Client',
       email: 'alice@client.com',
@@ -56,13 +54,21 @@ describe('Invoices API Integration Tests', () => {
     await db.delete(dbSchema.contacts);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/invoices');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -90,7 +96,7 @@ describe('Invoices API Integration Tests', () => {
       ],
     };
 
-    const req = new NextRequest('http://localhost/api/invoices', {
+    const req = createAuthenticatedRequest('http://localhost/api/invoices', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -107,7 +113,7 @@ describe('Invoices API Integration Tests', () => {
 
   it('should retrieve a single invoice by id', async () => {
     const invoicesResult = await db.insert(dbSchema.invoices).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       number: 'INV-SINGLE',
       contactId: testContactId,
       currency: 'CAD',
@@ -129,7 +135,7 @@ describe('Invoices API Integration Tests', () => {
       total: 1000,
     });
 
-    const req = new NextRequest(`http://localhost/api/invoices/${invoice.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/invoices/${invoice.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: invoice.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -141,7 +147,7 @@ describe('Invoices API Integration Tests', () => {
 
   it('should patch update an invoice, replacing line items', async () => {
     const invoicesResult = await db.insert(dbSchema.invoices).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       number: 'INV-PATCH',
       contactId: testContactId,
       currency: 'USD',
@@ -177,7 +183,7 @@ describe('Invoices API Integration Tests', () => {
       ],
     };
 
-    const req = new NextRequest(`http://localhost/api/invoices/${invoice.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/invoices/${invoice.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -193,7 +199,7 @@ describe('Invoices API Integration Tests', () => {
 
   it('should delete an invoice and write cascade snapshot to deletion_logs', async () => {
     const invoicesResult = await db.insert(dbSchema.invoices).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       number: 'INV-DELETE',
       contactId: testContactId,
       currency: 'USD',
@@ -215,7 +221,7 @@ describe('Invoices API Integration Tests', () => {
       total: 4000,
     });
 
-    const req = new NextRequest(`http://localhost/api/invoices/${invoice.id}?reason=Void`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/invoices/${invoice.id}?reason=Void`, {
       method: 'DELETE',
     });
 

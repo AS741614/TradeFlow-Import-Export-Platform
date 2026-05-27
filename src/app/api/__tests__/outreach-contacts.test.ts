@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../outreach-contacts/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../outreach-contacts/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+  TEST_USER_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Outreach Contacts API Integration Tests', () => {
   const db = getDb();
@@ -16,18 +27,8 @@ describe('Outreach Contacts API Integration Tests', () => {
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
 
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +36,21 @@ describe('Outreach Contacts API Integration Tests', () => {
     await db.delete(dbSchema.outreachContacts);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/outreach-contacts');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -60,7 +69,7 @@ describe('Outreach Contacts API Integration Tests', () => {
       source: 'manual',
     };
 
-    const req = new NextRequest('http://localhost/api/outreach-contacts', {
+    const req = createAuthenticatedRequest('http://localhost/api/outreach-contacts', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -71,7 +80,7 @@ describe('Outreach Contacts API Integration Tests', () => {
     expect(body.data.firstName).toBe('John');
     expect(body.data.lastName).toBe('Doe');
     expect(body.data.email).toBe('john.doe@example.com');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -85,7 +94,7 @@ describe('Outreach Contacts API Integration Tests', () => {
       source: 'invalid-source', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/outreach-contacts', {
+    const req = createAuthenticatedRequest('http://localhost/api/outreach-contacts', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -98,7 +107,7 @@ describe('Outreach Contacts API Integration Tests', () => {
 
   it('should retrieve a single outreach contact by id', async () => {
     const contactResult = await db.insert(dbSchema.outreachContacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       firstName: 'Jane',
       lastName: 'Smith',
       email: 'jane.smith@example.com',
@@ -110,7 +119,7 @@ describe('Outreach Contacts API Integration Tests', () => {
     }).returning();
     const contact = contactResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/outreach-contacts/${contact.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/outreach-contacts/${contact.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: contact.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -120,7 +129,7 @@ describe('Outreach Contacts API Integration Tests', () => {
 
   it('should patch update an outreach contact', async () => {
     const contactResult = await db.insert(dbSchema.outreachContacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       firstName: 'Alice',
       lastName: 'Johnson',
       email: 'alice.j@example.com',
@@ -138,7 +147,7 @@ describe('Outreach Contacts API Integration Tests', () => {
       tags: ['partner'],
     };
 
-    const req = new NextRequest(`http://localhost/api/outreach-contacts/${contact.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/outreach-contacts/${contact.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -153,7 +162,7 @@ describe('Outreach Contacts API Integration Tests', () => {
 
   it('should return 404 when updating non-existent outreach contact', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/outreach-contacts/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/outreach-contacts/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ firstName: 'Bob' }),
     });
@@ -164,7 +173,7 @@ describe('Outreach Contacts API Integration Tests', () => {
 
   it('should delete an outreach contact and write audit record to deletion_logs', async () => {
     const contactResult = await db.insert(dbSchema.outreachContacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       firstName: 'Charlie',
       lastName: 'Brown',
       email: 'charlie.b@example.com',
@@ -176,7 +185,7 @@ describe('Outreach Contacts API Integration Tests', () => {
     }).returning();
     const contact = contactResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/outreach-contacts/${contact.id}?reason=Duplicate%20entry`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/outreach-contacts/${contact.id}?reason=Duplicate%20entry`, {
       method: 'DELETE',
     });
 
@@ -195,5 +204,6 @@ describe('Outreach Contacts API Integration Tests', () => {
     expect(log.recordId).toBe(contact.id);
     expect((log.deletedData as any).firstName).toBe('Charlie');
     expect(log.reason).toBe('Duplicate entry');
+    expect(log.deletedByUserId).toBe(TEST_USER_ID);
   });
 });

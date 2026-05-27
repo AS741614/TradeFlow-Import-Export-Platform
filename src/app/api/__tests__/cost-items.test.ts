@@ -1,11 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../cost-items/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../cost-items/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Cost Items API Integration Tests', () => {
   const db = getDb();
@@ -13,21 +23,10 @@ describe('Cost Items API Integration Tests', () => {
   beforeEach(async () => {
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.costItems);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +34,21 @@ describe('Cost Items API Integration Tests', () => {
     await db.delete(dbSchema.costItems);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/cost-items');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -56,7 +63,7 @@ describe('Cost Items API Integration Tests', () => {
       currency: 'USD',
     };
 
-    const req = new NextRequest('http://localhost/api/cost-items', {
+    const req = createAuthenticatedRequest('http://localhost/api/cost-items', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -66,7 +73,7 @@ describe('Cost Items API Integration Tests', () => {
     const body = await res.json();
     expect(body.data.category).toBe('freight');
     expect(body.data.description).toBe('Air freight shipping fee');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -78,7 +85,7 @@ describe('Cost Items API Integration Tests', () => {
       currency: 'USDT', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/cost-items', {
+    const req = createAuthenticatedRequest('http://localhost/api/cost-items', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -91,7 +98,7 @@ describe('Cost Items API Integration Tests', () => {
 
   it('should retrieve a single cost item by id', async () => {
     const costResult = await db.insert(dbSchema.costItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       category: 'insurance',
       description: 'Marine cargo insurance',
       amount: 30000,
@@ -99,7 +106,7 @@ describe('Cost Items API Integration Tests', () => {
     }).returning();
     const costItem = costResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/cost-items/${costItem.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/cost-items/${costItem.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: costItem.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -109,7 +116,7 @@ describe('Cost Items API Integration Tests', () => {
 
   it('should patch update a cost item', async () => {
     const costResult = await db.insert(dbSchema.costItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       category: 'customs',
       description: 'Duty tax',
       amount: 50000,
@@ -122,7 +129,7 @@ describe('Cost Items API Integration Tests', () => {
       description: 'Duty tax revised',
     };
 
-    const req = new NextRequest(`http://localhost/api/cost-items/${costItem.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/cost-items/${costItem.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -136,7 +143,7 @@ describe('Cost Items API Integration Tests', () => {
 
   it('should return 404 when updating non-existent cost item', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/cost-items/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/cost-items/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ description: 'Testing' }),
     });
@@ -147,7 +154,7 @@ describe('Cost Items API Integration Tests', () => {
 
   it('should delete a cost item and write audit record to deletion_logs', async () => {
     const costResult = await db.insert(dbSchema.costItems).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       category: 'logistics',
       description: 'Trucking delivery fee',
       amount: 80000,
@@ -155,7 +162,7 @@ describe('Cost Items API Integration Tests', () => {
     }).returning();
     const costItem = costResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/cost-items/${costItem.id}?reason=Cancelled%20service`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/cost-items/${costItem.id}?reason=Cancelled%20service`, {
       method: 'DELETE',
     });
 

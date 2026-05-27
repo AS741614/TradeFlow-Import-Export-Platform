@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../contacts/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../contacts/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+  TEST_USER_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Contacts API Integration Tests', () => {
   const db = getDb();
@@ -14,22 +25,10 @@ describe('Contacts API Integration Tests', () => {
     // Clear test tables in dependency order
     await db.delete(dbSchema.deletionLogs);
     await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
-    // Seed default org and user
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    
+    // Seed default org and user via auth helper
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -38,13 +37,21 @@ describe('Contacts API Integration Tests', () => {
     await db.delete(dbSchema.contacts);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/contacts');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -63,7 +70,7 @@ describe('Contacts API Integration Tests', () => {
       notes: 'Some notes',
     };
 
-    const req = new NextRequest('http://localhost/api/contacts', {
+    const req = createAuthenticatedRequest('http://localhost/api/contacts', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -72,7 +79,7 @@ describe('Contacts API Integration Tests', () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.data.company).toBe('Integration LLC');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -82,7 +89,7 @@ describe('Contacts API Integration Tests', () => {
       email: 'not-an-email', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/contacts', {
+    const req = createAuthenticatedRequest('http://localhost/api/contacts', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -95,7 +102,7 @@ describe('Contacts API Integration Tests', () => {
 
   it('should retrieve a single contact by id', async () => {
     const insertedResult = await db.insert(dbSchema.contacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       company: 'Single Corp',
       contactPerson: 'Bob Single',
       email: 'bob@single.com',
@@ -106,7 +113,7 @@ describe('Contacts API Integration Tests', () => {
     }).returning();
     const inserted = insertedResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/contacts/${inserted.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/contacts/${inserted.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: inserted.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -116,14 +123,14 @@ describe('Contacts API Integration Tests', () => {
 
   it('should return 404 if contact does not exist', async () => {
     const fakeId = '00000000-0000-0000-0000-000000000000';
-    const req = new NextRequest(`http://localhost/api/contacts/${fakeId}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/contacts/${fakeId}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: fakeId }) });
     expect(res.status).toBe(404);
   });
 
   it('should patch update a contact', async () => {
     const insertedResult = await db.insert(dbSchema.contacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       company: 'Patch Corp',
       contactPerson: 'Charlie Patch',
       email: 'charlie@patch.com',
@@ -138,7 +145,7 @@ describe('Contacts API Integration Tests', () => {
       company: 'Updated Patch Corp',
     };
 
-    const req = new NextRequest(`http://localhost/api/contacts/${inserted.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/contacts/${inserted.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -152,7 +159,7 @@ describe('Contacts API Integration Tests', () => {
 
   it('should delete a contact and write to deletion_logs', async () => {
     const insertedResult = await db.insert(dbSchema.contacts).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       company: 'Delete Corp',
       contactPerson: 'David Delete',
       email: 'david@delete.com',
@@ -163,7 +170,7 @@ describe('Contacts API Integration Tests', () => {
     }).returning();
     const inserted = insertedResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/contacts/${inserted.id}?reason=ClosedBusiness`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/contacts/${inserted.id}?reason=ClosedBusiness`, {
       method: 'DELETE',
     });
 
@@ -183,7 +190,7 @@ describe('Contacts API Integration Tests', () => {
     expect(log.tableName).toBe('contacts');
     expect(log.recordId).toBe(inserted.id);
     expect((log.deletedData as any).company).toBe('Delete Corp');
-    expect(log.deletedByUserId).toBe(DEFAULT_USER_ID);
+    expect(log.deletedByUserId).toBe(TEST_USER_ID);
     expect(log.reason).toBe('ClosedBusiness');
   });
 });

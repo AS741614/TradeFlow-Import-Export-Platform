@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
-import { NextRequest } from 'next/server';
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
-import { DEFAULT_ORG_ID, DEFAULT_USER_ID } from '@/lib/db/constants';
 import { GET as listGET, POST as listPOST } from '../email-templates/route';
 import { GET as itemGET, PATCH as itemPATCH, DELETE as itemDELETE } from '../email-templates/[id]/route';
+import {
+  seedTestAuth,
+  mockAuthSession,
+  setLastRequest,
+  createAuthenticatedRequest,
+  mockAuthCall,
+  TEST_ORG_ID,
+  TEST_USER_ID,
+} from './_helpers/auth-fixture';
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn(() => Promise.resolve(mockAuthCall())),
+}));
 
 describe('Email Templates API Integration Tests', () => {
   const db = getDb();
@@ -16,18 +27,8 @@ describe('Email Templates API Integration Tests', () => {
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
 
-    await db.insert(dbSchema.orgs).values({
-      id: DEFAULT_ORG_ID,
-      name: 'Test Org',
-      country: 'Canada',
-    });
-    await db.insert(dbSchema.users).values({
-      id: DEFAULT_USER_ID,
-      email: 'test@example.com',
-      displayName: 'Test User',
-      orgId: DEFAULT_ORG_ID,
-      role: 'owner',
-    });
+    await seedTestAuth();
+    mockAuthSession();
   });
 
   afterEach(async () => {
@@ -35,13 +36,21 @@ describe('Email Templates API Integration Tests', () => {
     await db.delete(dbSchema.emailTemplates);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
+    setLastRequest(null);
   });
 
   afterAll(async () => {
     await closeDb();
   });
 
-  it('should return an empty list initially', async () => {
+  it('should reject unauthenticated requests with 401', async () => {
+    mockAuthSession(null);
+    const res = await listGET();
+    expect(res.status).toBe(401);
+  });
+
+  it('should return an empty list initially for authenticated users', async () => {
+    createAuthenticatedRequest('http://localhost/api/email-templates');
     const res = await listGET();
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -57,7 +66,7 @@ describe('Email Templates API Integration Tests', () => {
       variables: ['name'],
     };
 
-    const req = new NextRequest('http://localhost/api/email-templates', {
+    const req = createAuthenticatedRequest('http://localhost/api/email-templates', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -68,7 +77,7 @@ describe('Email Templates API Integration Tests', () => {
     expect(body.data.name).toBe('Introduction Mail');
     expect(body.data.category).toBe('introduction');
     expect(body.data.subject).toBe('Hello {{name}}');
-    expect(body.data.orgId).toBe(DEFAULT_ORG_ID);
+    expect(body.data.orgId).toBe(TEST_ORG_ID);
     expect(body.data.id).toBeDefined();
   });
 
@@ -79,7 +88,7 @@ describe('Email Templates API Integration Tests', () => {
       subject: '', // invalid
     };
 
-    const req = new NextRequest('http://localhost/api/email-templates', {
+    const req = createAuthenticatedRequest('http://localhost/api/email-templates', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -92,7 +101,7 @@ describe('Email Templates API Integration Tests', () => {
 
   it('should retrieve a single email template by id', async () => {
     const templateResult = await db.insert(dbSchema.emailTemplates).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Quotation Follow Up',
       category: 'follow-up',
       subject: 'Follow up regarding quotation {{quote_id}}',
@@ -101,7 +110,7 @@ describe('Email Templates API Integration Tests', () => {
     }).returning();
     const template = templateResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/email-templates/${template.id}`);
+    const req = createAuthenticatedRequest(`http://localhost/api/email-templates/${template.id}`);
     const res = await itemGET(req, { params: Promise.resolve({ id: template.id }) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -111,7 +120,7 @@ describe('Email Templates API Integration Tests', () => {
 
   it('should patch update an email template', async () => {
     const templateResult = await db.insert(dbSchema.emailTemplates).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Product Catalog Email',
       category: 'catalog',
       subject: 'Here is our new catalog',
@@ -125,7 +134,7 @@ describe('Email Templates API Integration Tests', () => {
       body: 'Updated files are attached.',
     };
 
-    const req = new NextRequest(`http://localhost/api/email-templates/${template.id}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/email-templates/${template.id}`, {
       method: 'PATCH',
       body: JSON.stringify(payload),
     });
@@ -139,7 +148,7 @@ describe('Email Templates API Integration Tests', () => {
 
   it('should return 404 when updating non-existent email template', async () => {
     const nonExistentId = '00000000-0000-0000-0000-999999999999';
-    const req = new NextRequest(`http://localhost/api/email-templates/${nonExistentId}`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/email-templates/${nonExistentId}`, {
       method: 'PATCH',
       body: JSON.stringify({ name: 'New template name' }),
     });
@@ -150,7 +159,7 @@ describe('Email Templates API Integration Tests', () => {
 
   it('should delete an email template and write audit record to deletion_logs', async () => {
     const templateResult = await db.insert(dbSchema.emailTemplates).values({
-      orgId: DEFAULT_ORG_ID,
+      orgId: TEST_ORG_ID,
       name: 'Temporary Catalog',
       category: 'catalog',
       subject: 'Temp catalog subject',
@@ -159,7 +168,7 @@ describe('Email Templates API Integration Tests', () => {
     }).returning();
     const template = templateResult[0]!;
 
-    const req = new NextRequest(`http://localhost/api/email-templates/${template.id}?reason=Obsolete%20catalog`, {
+    const req = createAuthenticatedRequest(`http://localhost/api/email-templates/${template.id}?reason=Obsolete%20catalog`, {
       method: 'DELETE',
     });
 
@@ -178,5 +187,6 @@ describe('Email Templates API Integration Tests', () => {
     expect(log.recordId).toBe(template.id);
     expect((log.deletedData as any).name).toBe('Temporary Catalog');
     expect(log.reason).toBe('Obsolete catalog');
+    expect(log.deletedByUserId).toBe(TEST_USER_ID);
   });
 });

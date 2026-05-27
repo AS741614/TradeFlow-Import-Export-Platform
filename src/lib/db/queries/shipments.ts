@@ -3,14 +3,13 @@ import { shipments, shipmentProducts, shipmentDocuments, products } from '../sch
 import { eq } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
-import { DEFAULT_ORG_ID } from '../constants';
 import type { InsertShipmentInput, UpdateShipmentInput } from '../validation/shipments';
 
-export async function getShipments() {
+export async function getShipments(orgId: string) {
   const db = getDb();
   
   // 1. Fetch shipments
-  const shipmentRows = await db.select().from(shipments).where(withTenant(shipments));
+  const shipmentRows = await db.select().from(shipments).where(withTenant(shipments, orgId));
   
   // 2. Fetch products and documents for each shipment
   const result = [];
@@ -40,10 +39,10 @@ export async function getShipments() {
   return result;
 }
 
-export async function getShipmentById(id: string, tx?: TxClient) {
+export async function getShipmentById(orgId: string, id: string, tx?: TxClient) {
   const client = tx ?? getDb();
   const rows = await client.select().from(shipments).where(
-    withTenant(shipments, eq(shipments.id, id))
+    withTenant(shipments, orgId, eq(shipments.id, id))
   );
   const shipment = rows[0];
   if (!shipment) return null;
@@ -70,7 +69,7 @@ export async function getShipmentById(id: string, tx?: TxClient) {
   };
 }
 
-export async function createShipment(data: InsertShipmentInput) {
+export async function createShipment(orgId: string, data: InsertShipmentInput) {
   const db = getDb();
   const { products: productsData, documents: documentsData, ...shipmentFields } = data;
 
@@ -78,7 +77,7 @@ export async function createShipment(data: InsertShipmentInput) {
     // 1. Insert shipment
     const shipmentResult = await tx.insert(shipments).values({
       ...shipmentFields,
-      orgId: DEFAULT_ORG_ID,
+      orgId,
     }).returning();
     const shipment = shipmentResult[0];
     if (!shipment) {
@@ -130,7 +129,7 @@ export async function createShipment(data: InsertShipmentInput) {
   });
 }
 
-export async function updateShipment(id: string, data: UpdateShipmentInput) {
+export async function updateShipment(orgId: string, id: string, data: UpdateShipmentInput) {
   const db = getDb();
   const { products: productsData, documents: documentsData, ...shipmentFields } = data;
 
@@ -141,7 +140,7 @@ export async function updateShipment(id: string, data: UpdateShipmentInput) {
         ...shipmentFields,
         updatedAt: new Date().toISOString(),
       })
-      .where(withTenant(shipments, eq(shipments.id, id)))
+      .where(withTenant(shipments, orgId, eq(shipments.id, id)))
       .returning();
     const shipment = shipmentResult[0];
 
@@ -178,24 +177,25 @@ export async function updateShipment(id: string, data: UpdateShipmentInput) {
     }
 
     // Fetch the final updated nested record using tx
-    const updated = await getShipmentById(id, tx);
+    const updated = await getShipmentById(orgId, id, tx);
     return updated;
   });
 }
 
-export async function deleteShipment(id: string, reason?: string) {
+export async function deleteShipment(orgId: string, id: string, userId: string, reason?: string) {
   return deleteWithLog(
     'shipments',
     id,
+    userId,
     async (tx: TxClient) => {
       // Get the complete nested shipment structure
-      const shipment = await getShipmentById(id, tx);
+      const shipment = await getShipmentById(orgId, id, tx);
       return shipment;
     },
     async (tx: TxClient) => {
       // Cascade delete handles shipment_products and shipment_documents
       await tx.delete(shipments).where(
-        withTenant(shipments, eq(shipments.id, id))
+        withTenant(shipments, orgId, eq(shipments.id, id))
       );
     },
     reason
