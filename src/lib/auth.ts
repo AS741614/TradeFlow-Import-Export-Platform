@@ -16,6 +16,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     sessionsTable: sessions,
     verificationTokensTable: verificationTokens,
   }),
+  session: {
+    strategy: 'database',
+  },
   providers: [
     ...authConfig.providers,
     CredentialsProvider({

@@ -42,35 +42,47 @@ export default function DashboardPage() {
       try {
         let products = await getItems<Product>('products');
         if (products.length === 0) {
-          const samples = getSampleProducts();
-          const seeded: Product[] = [];
-          for (const item of samples) {
-            const added = await addItem<Product>('products', item);
-            seeded.splice(0, seeded.length, ...added);
+          try {
+            const samples = getSampleProducts();
+            const seeded: Product[] = [];
+            for (const item of samples) {
+              const added = await addItem<Product>('products', item);
+              seeded.splice(0, seeded.length, ...added);
+            }
+            products = seeded;
+          } catch (err) {
+            console.warn('Failed to seed sample products (likely due to missing organization):', err);
           }
-          products = seeded;
         }
 
         let contacts = await getItems<Contact>('contacts');
         if (contacts.length === 0) {
-          const samples = getSampleContacts();
-          const seeded: Contact[] = [];
-          for (const item of samples) {
-            const added = await addItem<Contact>('contacts', item);
-            seeded.splice(0, seeded.length, ...added);
+          try {
+            const samples = getSampleContacts();
+            const seeded: Contact[] = [];
+            for (const item of samples) {
+              const added = await addItem<Contact>('contacts', item);
+              seeded.splice(0, seeded.length, ...added);
+            }
+            contacts = seeded;
+          } catch (err) {
+            console.warn('Failed to seed sample contacts (likely due to missing organization):', err);
           }
-          contacts = seeded;
         }
 
         let tasks = await getItems<Task>('tasks');
         if (tasks.length === 0) {
-          const defaults = getDefaultTasks();
-          const seeded: Task[] = [];
-          for (const item of defaults) {
-            const added = await addItem<Task>('tasks', item);
-            seeded.splice(0, seeded.length, ...added);
+          try {
+            const defaults = getDefaultTasks();
+            const seeded: Task[] = [];
+            for (const item of defaults) {
+              const added = await addItem<Task>('tasks', item);
+              seeded.splice(0, seeded.length, ...added);
+            }
+            tasks = seeded;
+          } catch (err) {
+            console.warn('Failed to seed default tasks (likely due to missing organization):', err);
           }
-          tasks = seeded;
         }
 
         const [shipments, invoices, campaigns] = await Promise.all([

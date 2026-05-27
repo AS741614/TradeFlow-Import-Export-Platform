@@ -204,11 +204,11 @@ export function getDefaultBusinessPlan(): BusinessPlanSection[] {
 export function getSampleProducts(): Product[] {
   const now = nowISO();
   return [
-    { id: generateId(), name: 'Organic Cotton Fabric', sku: 'TEX-001', hsCode: '5208.12', category: 'Textiles & Apparel', quantity: 5000, reorderLevel: 1000, unitCost: 4.50, currency: 'USD', supplier: 'Mumbai Textiles Co.', origin: 'India', status: 'in-stock', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Stainless Steel Bolts M8', sku: 'MET-015', hsCode: '7318.15', category: 'Raw Materials', quantity: 250, reorderLevel: 500, unitCost: 0.85, currency: 'USD', supplier: 'Shanghai Steel Works', origin: 'China', status: 'low-stock', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Arabica Coffee Beans', sku: 'FNB-003', hsCode: '0901.11', category: 'Food & Beverages', quantity: 0, reorderLevel: 200, unitCost: 12.00, currency: 'USD', supplier: 'Colombian Coffee Exports', origin: 'Brazil', status: 'out-of-stock', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'LED Panel Light 60W', sku: 'ELC-042', hsCode: '9405.42', category: 'Electronics', quantity: 3200, reorderLevel: 500, unitCost: 18.75, currency: 'USD', supplier: 'Shenzhen Bright Co.', origin: 'China', status: 'in-stock', createdAt: now, updatedAt: now },
-    { id: generateId(), name: 'Bamboo Cutting Board Set', sku: 'HOM-008', hsCode: '4419.12', category: 'Consumer Goods', quantity: 1800, reorderLevel: 400, unitCost: 6.20, currency: 'USD', supplier: 'Vietnam Bamboo Ltd.', origin: 'Vietnam', status: 'in-stock', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Organic Cotton Fabric', sku: 'TEX-001', hsCode: '5208.12', category: 'Textiles & Apparel', quantity: 5000, reorderLevel: 1000, unitCost: 450, currency: 'USD', supplier: 'Mumbai Textiles Co.', origin: 'India', status: 'in-stock', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Stainless Steel Bolts M8', sku: 'MET-015', hsCode: '7318.15', category: 'Raw Materials', quantity: 250, reorderLevel: 500, unitCost: 85, currency: 'USD', supplier: 'Shanghai Steel Works', origin: 'China', status: 'low-stock', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Arabica Coffee Beans', sku: 'FNB-003', hsCode: '0901.11', category: 'Food & Beverages', quantity: 0, reorderLevel: 200, unitCost: 1200, currency: 'USD', supplier: 'Colombian Coffee Exports', origin: 'Brazil', status: 'out-of-stock', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'LED Panel Light 60W', sku: 'ELC-042', hsCode: '9405.42', category: 'Electronics', quantity: 3200, reorderLevel: 500, unitCost: 1875, currency: 'USD', supplier: 'Shenzhen Bright Co.', origin: 'China', status: 'in-stock', createdAt: now, updatedAt: now },
+    { id: generateId(), name: 'Bamboo Cutting Board Set', sku: 'HOM-008', hsCode: '4419.12', category: 'Consumer Goods', quantity: 1800, reorderLevel: 400, unitCost: 620, currency: 'USD', supplier: 'Vietnam Bamboo Ltd.', origin: 'Vietnam', status: 'in-stock', createdAt: now, updatedAt: now },
   ];
 }
 

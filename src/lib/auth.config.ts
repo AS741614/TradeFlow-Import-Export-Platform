@@ -2,9 +2,6 @@ import type { NextAuthConfig } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 
 export const authConfig = {
-  session: {
-    strategy: 'database',
-  },
   cookies: {
     sessionToken: {
       name: process.env.NODE_ENV === 'production' 
