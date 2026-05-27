@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getItems, STORAGE_KEYS } from '@/lib/storage';
+import { getItems } from '@/lib/storage';
 import { formatCurrency } from '@/lib/utils';
 import type { CostItem, FinancialProjection } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 // ---- Aggregated finance metrics ----
 interface FinanceMetrics {
@@ -29,19 +32,48 @@ function computeMetrics(
 }
 
 export default function FinanceOverviewPage() {
-  const [costItems] = useState<CostItem[]>(() => getItems<CostItem>(STORAGE_KEYS.COST_ITEMS));
-  const [metrics] = useState<FinanceMetrics>(() => {
-    const items = getItems<CostItem>(STORAGE_KEYS.COST_ITEMS);
-    const projections = getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS);
-    return computeMetrics(items, projections);
+  const [costItems, setCostItems] = useState<CostItem[]>([]);
+  const [metrics, setMetrics] = useState<FinanceMetrics>({
+    totalRevenue: 0,
+    totalExpenses: 0,
+    netProfit: 0,
+    avgMargin: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [costs, projections] = await Promise.all([
+          getItems<CostItem>('cost-items'),
+          getItems<FinancialProjection>('financial-projections'),
+        ]);
+        if (!cancelled) {
+          setCostItems(costs);
+          const computed = computeMetrics(costs, projections);
+          setMetrics(computed);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load finance data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const recentCostItems = costItems.slice(-8).reverse();
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">

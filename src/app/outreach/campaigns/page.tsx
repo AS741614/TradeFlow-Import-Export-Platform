@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems, addItem, removeItem } from '@/lib/storage';
 import { generateId, nowISO, toISODate } from '@/lib/utils';
 import { runCampaignSimulation } from '@/lib/email';
 import type { Campaign, EmailTemplate, OutreachContact } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const INITIAL_WIZARD = {
   step: 1,
@@ -17,15 +20,44 @@ const INITIAL_WIZARD = {
 };
 
 export default function CampaignsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(() => getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS));
-  const [templates] = useState<EmailTemplate[]>(() => getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES));
-  const [contacts] = useState<OutreachContact[]>(() => getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS));
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [contacts, setContacts] = useState<OutreachContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
 
   // Wizard state
   const [showWizard, setShowWizard] = useState(false);
   const [wizard, setWizard] = useState(INITIAL_WIZARD);
   const [contactSearch, setContactSearch] = useState('');
   const [contactTagFilter, setContactTagFilter] = useState('all');
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [camps, temps, conts] = await Promise.all([
+          getItems<Campaign>('campaigns'),
+          getItems<EmailTemplate>('email-templates'),
+          getItems<OutreachContact>('outreach-contacts'),
+        ]);
+        if (!cancelled) {
+          setCampaigns(camps);
+          setTemplates(temps);
+          setContacts(conts);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load campaigns data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openWizard = () => {
     if (templates.length === 0) {
@@ -99,61 +131,99 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleLaunchCampaign = () => {
+  const handleRun = async (id: string) => {
+    if (runningIds.has(id)) return;
+    setRunningIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setError(null);
+    try {
+      await runCampaignSimulation(id);
+      const fresh = await getItems<Campaign>('campaigns');
+      setCampaigns(fresh);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Campaign simulation failed');
+    } finally {
+      setRunningIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
+  const handleLaunchCampaign = async () => {
     const selectedTemplate = templates.find((t) => t.id === wizard.templateId);
     if (!selectedTemplate) return;
 
-    const newCampaign: Campaign = {
-      id: generateId(),
-      name: wizard.name.trim(),
-      templateId: wizard.templateId,
-      contactIds: wizard.contactIds,
-      status: wizard.scheduleType === 'immediate' ? 'sending' : 'scheduled',
-      schedule: {
-        type: wizard.scheduleType,
-        scheduledAt: wizard.scheduleType === 'scheduled' ? wizard.scheduledAt : undefined,
-        sendsPerHour: wizard.scheduleType === 'drip' ? wizard.sendsPerHour : undefined,
-      },
-      subjectLineA: selectedTemplate.subject,
-      stats: {
-        total: wizard.contactIds.length,
-        sent: 0,
-        delivered: 0,
-        opened: 0,
-        clicked: 0,
-        replied: 0,
-        bounced: 0,
-        failed: 0,
-      },
-      createdAt: nowISO(),
-      updatedAt: nowISO(),
-    };
+    setLoading(true);
+    setError(null);
+    try {
+      const newCampaign: Campaign = {
+        id: generateId(),
+        name: wizard.name.trim(),
+        templateId: wizard.templateId,
+        contactIds: wizard.contactIds,
+        status: wizard.scheduleType === 'immediate' ? 'sending' : 'scheduled',
+        schedule: {
+          type: wizard.scheduleType,
+          scheduledAt: wizard.scheduleType === 'scheduled' ? wizard.scheduledAt : undefined,
+          sendsPerHour: wizard.scheduleType === 'drip' ? wizard.sendsPerHour : undefined,
+        },
+        subjectLineA: selectedTemplate.subject,
+        stats: {
+          total: wizard.contactIds.length,
+          sent: 0,
+          delivered: 0,
+          opened: 0,
+          clicked: 0,
+          replied: 0,
+          bounced: 0,
+          failed: 0,
+        },
+        createdAt: nowISO(),
+        updatedAt: nowISO(),
+      };
 
-    const updatedCampaigns = addItem<Campaign>(STORAGE_KEYS.CAMPAIGNS, newCampaign);
-    setCampaigns(updatedCampaigns);
-    closeWizard();
+      const updatedCampaigns = await addItem<Campaign>('campaigns', newCampaign);
+      setCampaigns(updatedCampaigns);
+      closeWizard();
 
-    // Trigger simulation send if set to immediate
-    if (wizard.scheduleType === 'immediate') {
-      runCampaignSimulation(newCampaign.id);
-      // Wait and reload after simulation completes to fetch fresh simulation stats
-      setTimeout(() => {
-        setCampaigns(getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS));
-      }, 2000);
+      // Trigger simulation send if set to immediate
+      if (wizard.scheduleType === 'immediate') {
+        void handleRun(newCampaign.id);
+      }
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to launch campaign');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteCampaign = (id: string) => {
+  const handleDeleteCampaign = async (id: string) => {
     if (confirm('Are you sure you want to delete this campaign?')) {
-      const updated = removeItem<Campaign>(STORAGE_KEYS.CAMPAIGNS, id);
-      setCampaigns(updated);
+      setLoading(true);
+      setError(null);
+      try {
+        const updated = await removeItem<Campaign>('campaigns', id);
+        setCampaigns(updated);
+      } catch (err) {
+        setError(err instanceof StorageError ? err.message : 'Failed to delete campaign');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
 
+
+  if (loading) return <Loading />;
 
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
@@ -198,10 +268,21 @@ export default function CampaignsPage() {
                     <span className={`badge ${statusClass}`} style={{ textTransform: 'capitalize' }}>
                       {camp.status}
                     </span>
+                    {(camp.status === 'sending' || camp.status === 'scheduled') && (
+                      <button
+                        id={`btn-run-campaign-${camp.id}`}
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => { void handleRun(camp.id); }}
+                        disabled={runningIds.has(camp.id)}
+                        style={{ padding: '4px 8px', fontSize: 'var(--font-size-xs)' }}
+                      >
+                        {runningIds.has(camp.id) ? 'Running...' : 'Run'}
+                      </button>
+                    )}
                     <button
                       id={`btn-delete-campaign-${camp.id}`}
                       className="btn btn-danger btn-sm btn-icon"
-                      onClick={() => handleDeleteCampaign(camp.id)}
+                      onClick={() => { void handleDeleteCampaign(camp.id); }}
                       title="Delete Campaign"
                     >
                       <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
@@ -452,7 +533,7 @@ export default function CampaignsPage() {
               {wizard.step < 5 ? (
                 <button id="btn-wizard-next" className="btn btn-primary" onClick={nextStep}>Next</button>
               ) : (
-                <button id="btn-wizard-launch" className="btn btn-primary" onClick={handleLaunchCampaign}>Launch Campaign</button>
+                <button id="btn-wizard-launch" className="btn btn-primary" onClick={() => { void handleLaunchCampaign(); }}>Launch Campaign</button>
               )}
             </div>
           </div>

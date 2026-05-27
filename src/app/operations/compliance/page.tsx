@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, formatDate, getStatusColor, nowISO, toISODate } from '@/lib/utils';
 import type { ComplianceItem, Shipment } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const EMPTY_FORM = {
   shipmentId: '',
@@ -25,50 +28,74 @@ const COMPLIANCE_DOC_TYPES = [
 ];
 
 export default function CompliancePage() {
-  const [shipments] = useState<Shipment[]>(() => getItems<Shipment>(STORAGE_KEYS.SHIPMENTS));
-  const [complianceItems, setComplianceItems] = useState<ComplianceItem[]>(() => {
-    let storedCompliance = getItems<ComplianceItem>(STORAGE_KEYS.COMPLIANCE);
-    const storedShipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
-
-    // If there's no compliance items, let's seed a couple default ones if we have shipments, or just standard ones
-    if (storedCompliance.length === 0) {
-      const now = toISODate(nowISO());
-      const defaults: ComplianceItem[] = [
-        {
-          id: generateId(),
-          documentName: 'Export Customs Declaration',
-          documentType: 'customs-declaration',
-          status: 'pending',
-          requiredBy: toISODate(Date.now() + 15 * 24 * 60 * 60 * 1000),
-          notes: 'Required for cargo clearance at local custom port.',
-        },
-        {
-          id: generateId(),
-          documentName: 'Commercial Invoice & Packing List',
-          documentType: 'commercial-invoice',
-          status: 'approved',
-          requiredBy: now,
-          notes: 'Completed and verified by trade operations manager.',
-        },
-      ];
-
-      const d0 = defaults[0];
-      const d1 = defaults[1];
-      const s0 = storedShipments[0];
-      if (d0 && d1 && s0) {
-        d0.shipmentId = s0.id;
-        d1.shipmentId = s0.id;
-      }
-
-      setItems(STORAGE_KEYS.COMPLIANCE, defaults);
-      storedCompliance = defaults;
-    }
-    return storedCompliance;
-  });
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [complianceItems, setComplianceItems] = useState<ComplianceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const storedShipments = await getItems<Shipment>('shipments');
+        let storedCompliance = await getItems<ComplianceItem>('compliance');
+
+        if (storedCompliance.length === 0) {
+          const now = toISODate(nowISO());
+          const defaults: ComplianceItem[] = [
+            {
+              id: generateId(),
+              documentName: 'Export Customs Declaration',
+              documentType: 'customs-declaration',
+              status: 'pending',
+              requiredBy: toISODate(Date.now() + 15 * 24 * 60 * 60 * 1000),
+              notes: 'Required for cargo clearance at local custom port.',
+            },
+            {
+              id: generateId(),
+              documentName: 'Commercial Invoice & Packing List',
+              documentType: 'commercial-invoice',
+              status: 'approved',
+              requiredBy: now,
+              notes: 'Completed and verified by trade operations manager.',
+            },
+          ];
+
+          const d0 = defaults[0];
+          const d1 = defaults[1];
+          const s0 = storedShipments[0];
+          if (d0 && d1 && s0) {
+            d0.shipmentId = s0.id;
+            d1.shipmentId = s0.id;
+          }
+
+          const seeded: ComplianceItem[] = [];
+          for (const item of defaults) {
+            const added = await addItem<ComplianceItem>('compliance', item);
+            seeded.splice(0, seeded.length, ...added);
+          }
+          storedCompliance = seeded;
+        }
+
+        if (!cancelled) {
+          setShipments(storedShipments);
+          setComplianceItems(storedCompliance);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load compliance data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openAdd = useCallback(() => {
     setEditingId(null);
@@ -105,32 +132,48 @@ export default function CompliancePage() {
     []
   );
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!form.documentName.trim() || !form.requiredBy) return;
 
-    if (editingId) {
-      const updated = updateItem<ComplianceItem>(STORAGE_KEYS.COMPLIANCE, editingId, {
-        ...form,
-        submittedAt: form.status === 'submitted' || form.status === 'approved' ? nowISO() : undefined,
-        approvedAt: form.status === 'approved' ? nowISO() : undefined,
-      });
-      setComplianceItems(updated);
-    } else {
-      const newItem: ComplianceItem = {
-        id: generateId(),
-        ...form,
-        submittedAt: form.status === 'submitted' || form.status === 'approved' ? nowISO() : undefined,
-        approvedAt: form.status === 'approved' ? nowISO() : undefined,
-      };
-      const updated = addItem<ComplianceItem>(STORAGE_KEYS.COMPLIANCE, newItem);
-      setComplianceItems(updated);
+    setLoading(true);
+    setError(null);
+    try {
+      if (editingId) {
+        const updated = await updateItem<ComplianceItem>('compliance', editingId, {
+          ...form,
+          submittedAt: form.status === 'submitted' || form.status === 'approved' ? nowISO() : undefined,
+          approvedAt: form.status === 'approved' ? nowISO() : undefined,
+        });
+        setComplianceItems(updated);
+      } else {
+        const newItem: ComplianceItem = {
+          id: generateId(),
+          ...form,
+          submittedAt: form.status === 'submitted' || form.status === 'approved' ? nowISO() : undefined,
+          approvedAt: form.status === 'approved' ? nowISO() : undefined,
+        };
+        const updated = await addItem<ComplianceItem>('compliance', newItem);
+        setComplianceItems(updated);
+      }
+      closeModal();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save compliance item');
+    } finally {
+      setLoading(false);
     }
-    closeModal();
   }, [form, editingId, closeModal]);
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = removeItem<ComplianceItem>(STORAGE_KEYS.COMPLIANCE, id);
-    setComplianceItems(updated);
+  const handleDelete = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await removeItem<ComplianceItem>('compliance', id);
+      setComplianceItems(updated);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete compliance item');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const getShipmentRef = (shipmentId?: string) => {
@@ -146,8 +189,11 @@ export default function CompliancePage() {
 
 
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
@@ -253,7 +299,7 @@ export default function CompliancePage() {
                       <button
                         id={`btn-delete-compliance-${item.id}`}
                         className="btn btn-danger btn-sm btn-icon"
-                        onClick={() => handleDelete(item.id)}
+                        onClick={() => { void handleDelete(item.id); }}
                         title="Delete"
                       >
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
@@ -372,7 +418,7 @@ export default function CompliancePage() {
               <button
                 id="btn-save-compliance"
                 className="btn btn-primary"
-                onClick={handleSubmit}
+                onClick={() => { void handleSubmit(); }}
                 disabled={!form.documentName.trim() || !form.requiredBy}
               >
                 {editingId ? 'Save Changes' : 'Add Item'}

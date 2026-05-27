@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // In a real production deployment, this would use:
     // const resend = new Resend(process.env.RESEND_API_KEY);
     // and queue the actual transmissions.
-    runCampaignSimulation(campaignId);
+    void runCampaignSimulation(campaignId);
 
     return NextResponse.json({
       success: true,

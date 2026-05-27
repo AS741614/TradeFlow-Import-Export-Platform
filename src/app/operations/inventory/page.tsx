@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, formatCurrency, getStatusColor, nowISO } from '@/lib/utils';
 import { PRODUCT_CATEGORIES, COUNTRIES, CURRENCIES, DEFAULT_PRODUCT_CATEGORY, DEFAULT_COUNTRY } from '@/lib/constants';
 import type { Product } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 // ---- Helpers ----
 
@@ -30,11 +33,31 @@ const EMPTY_FORM: Omit<Product, 'id' | 'status' | 'createdAt' | 'updatedAt'> = {
 // ---- Component ----
 
 export default function InventoryPage() {
-  const [products, setProducts] = useState<Product[]>(() => getItems<Product>(STORAGE_KEYS.PRODUCTS));
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await getItems<Product>('products');
+        if (!cancelled) setProducts(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load products');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filtered products based on search
   const filtered = products.filter((p) => {
@@ -79,36 +102,44 @@ export default function InventoryPage() {
     setForm(EMPTY_FORM);
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!form.name.trim() || !form.sku.trim()) return;
 
     const status = calcStatus(form.quantity, form.reorderLevel);
     const now = nowISO();
 
-    if (editingId) {
-      const updated = updateItem<Product>(STORAGE_KEYS.PRODUCTS, editingId, {
-        ...form,
-        status,
-        updatedAt: now,
-      });
-      setProducts(updated);
-    } else {
-      const newProduct: Product = {
-        id: generateId(),
-        ...form,
-        status,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const updated = addItem<Product>(STORAGE_KEYS.PRODUCTS, newProduct);
-      setProducts(updated);
+    try {
+      if (editingId) {
+        const updated = await updateItem<Product>('products', editingId, {
+          ...form,
+          status,
+          updatedAt: now,
+        });
+        setProducts(updated);
+      } else {
+        const newProduct: Product = {
+          id: generateId(),
+          ...form,
+          status,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const updated = await addItem<Product>('products', newProduct);
+        setProducts(updated);
+      }
+      closeModal();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save product');
     }
-    closeModal();
   }, [form, editingId, closeModal]);
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = removeItem<Product>(STORAGE_KEYS.PRODUCTS, id);
-    setProducts(updated);
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      const updated = await removeItem<Product>('products', id);
+      setProducts(updated);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete product');
+    }
   }, []);
 
   const updateField = useCallback(
@@ -117,8 +148,6 @@ export default function InventoryPage() {
     },
     []
   );
-
-
 
   return (
     <div className="animate-fade-in">
@@ -134,7 +163,12 @@ export default function InventoryPage() {
         <p>Manage your product catalog, stock levels, and sourcing details.</p>
       </div>
 
-      {/* Data Table */}
+      {error && <ErrorBanner message={error} />}
+
+      {loading ? (
+        <Loading />
+      ) : (
+        /* Data Table */
       <div className="data-table-wrapper">
         <div className="data-table-header">
           <h3>{filtered.length} Product{filtered.length !== 1 ? 's' : ''}</h3>
@@ -192,7 +226,7 @@ export default function InventoryPage() {
                       <button
                         id={`btn-delete-product-${product.id}`}
                         className="btn btn-danger btn-sm btn-icon"
-                        onClick={() => handleDelete(product.id)}
+                        onClick={() => { void handleDelete(product.id); }}
                         title="Delete"
                       >
                         <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
@@ -210,6 +244,7 @@ export default function InventoryPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Add / Edit Modal */}
       {showModal && (
@@ -361,7 +396,7 @@ export default function InventoryPage() {
               <button
                 id="btn-save-product"
                 className="btn btn-primary"
-                onClick={handleSubmit}
+                onClick={() => { void handleSubmit(); }}
                 disabled={!form.name.trim() || !form.sku.trim()}
               >
                 {editingId ? 'Update Product' : 'Add Product'}

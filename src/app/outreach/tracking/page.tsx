@@ -1,20 +1,43 @@
 'use client';
 
-import { useState } from 'react';
-import { getItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems } from '@/lib/storage';
 import { formatNumber, calcPercentage } from '@/lib/utils';
 import type { Campaign } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 export default function OutreachTrackingPage() {
-  const [campaigns] = useState<Campaign[]>(() => getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS));
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string>(() => {
-    const stored = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-    return stored[0]?.id ?? '';
-  });
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await getItems<Campaign>('campaigns');
+        if (!cancelled) {
+          setCampaigns(data);
+          if (data.length > 0 && data[0]) {
+            setSelectedCampaignId(data[0].id);
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load campaigns');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeCampaign = campaigns.find((c) => c.id === selectedCampaignId);
-
-
 
   // Funnel calculations based on selected campaign stats
   const stats = activeCampaign?.stats ?? {
@@ -65,7 +88,11 @@ export default function OutreachTrackingPage() {
         <p>Analyze prospect conversion rates, delivery statistics, and outreach funnel progression.</p>
       </div>
 
-      {activeCampaign ? (
+      {error && <ErrorBanner message={error} />}
+
+      {loading ? (
+        <Loading />
+      ) : activeCampaign ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
           {/* Tracking metric cards */}
           <div className="grid-3" style={{ gap: 'var(--space-lg)' }}>
@@ -183,7 +210,7 @@ export default function OutreachTrackingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>
-                    <span>In-Box Open Ratio</span>
+                    <span><span>In-Box Open Ratio</span></span>
                     <strong>{openRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
@@ -193,7 +220,7 @@ export default function OutreachTrackingPage() {
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>
-                    <span>Click-Through Ratio (CTR)</span>
+                    <span><span>Click-Through Ratio (CTR)</span></span>
                     <strong>{clickRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
@@ -203,7 +230,7 @@ export default function OutreachTrackingPage() {
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--font-size-sm)', marginBottom: '4px' }}>
-                    <span>Interest / Response Ratio</span>
+                    <span><span>Interest / Response Ratio</span></span>
                     <strong>{replyRate}%</strong>
                   </div>
                   <div style={{ height: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>

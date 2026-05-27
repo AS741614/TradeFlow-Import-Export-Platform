@@ -1,39 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { getItems, setItems, STORAGE_KEYS, getValue, setValue } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { getDefaultBusinessPlan, getDefaultSwotItems } from '@/lib/constants';
 import type { BusinessPlanSection, SwotItem } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 export default function BusinessPlanPage() {
-  const [sections, setSections] = useState<BusinessPlanSection[]>(() => {
-    let loadedSections = getItems<BusinessPlanSection>(STORAGE_KEYS.BUSINESS_PLAN);
-    if (loadedSections.length === 0) {
-      const defaults = getDefaultBusinessPlan();
-      setItems(STORAGE_KEYS.BUSINESS_PLAN, defaults);
-      loadedSections = defaults;
-    }
-    return loadedSections.sort((a, b) => a.order - b.order);
-  });
-  const [swotItems, setSwotItems] = useState<SwotItem[]>(() => {
-    let loadedSwot = getItems<SwotItem>(STORAGE_KEYS.SWOT);
-    if (loadedSwot.length === 0) {
-      const defaults = getDefaultSwotItems();
-      setItems(STORAGE_KEYS.SWOT, defaults);
-      loadedSwot = defaults;
-    }
-    return loadedSwot;
-  });
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    let loadedSections = getItems<BusinessPlanSection>(STORAGE_KEYS.BUSINESS_PLAN);
-    if (loadedSections.length === 0) {
-      loadedSections = getDefaultBusinessPlan();
-    }
-    const sorted = loadedSections.sort((a, b) => a.order - b.order);
-    return sorted[0]?.id ?? '';
-  });
-  const [lastSaved, setLastSaved] = useState<string>(() => getValue<string>('bp_last_saved', nowISO()));
+  const [sections, setSections] = useState<BusinessPlanSection[]>([]);
+  const [swotItems, setSwotItems] = useState<SwotItem[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('');
+  const [lastSaved, setLastSaved] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // New SWOT item inputs for each quadrant
   const [newStrength, setNewStrength] = useState('');
@@ -41,49 +23,95 @@ export default function BusinessPlanPage() {
   const [newOpportunity, setNewOpportunity] = useState('');
   const [newThreat, setNewThreat] = useState('');
 
-  // Save sections helper
-  const saveSections = (updatedSections: BusinessPlanSection[]) => {
-    setSections(updatedSections);
-    setItems(STORAGE_KEYS.BUSINESS_PLAN, updatedSections);
-    const now = nowISO();
-    setLastSaved(now);
-    setValue('bp_last_saved', now);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        let loadedSections = await getItems<BusinessPlanSection>('business-plan');
+        if (loadedSections.length === 0) {
+          const defaults = getDefaultBusinessPlan();
+          const seeded: BusinessPlanSection[] = [];
+          for (const item of defaults) {
+            const added = await addItem<BusinessPlanSection>('business-plan', item);
+            seeded.splice(0, seeded.length, ...added);
+          }
+          loadedSections = seeded;
+        }
+
+        let loadedSwot = await getItems<SwotItem>('swot');
+        if (loadedSwot.length === 0) {
+          const defaults = getDefaultSwotItems();
+          const seededSwot: SwotItem[] = [];
+          for (const item of defaults) {
+            const added = await addItem<SwotItem>('swot', item);
+            seededSwot.splice(0, seededSwot.length, ...added);
+          }
+          loadedSwot = seededSwot;
+        }
+
+        if (!cancelled) {
+          const sorted = loadedSections.sort((a, b) => a.order - b.order);
+          setSections(sorted);
+          setSwotItems(loadedSwot);
+          setActiveTab(sorted[0]?.id ?? '');
+          setLastSaved(nowISO());
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load business plan');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSectionTextChange = async (sectionId: string, newText: string) => {
+    setError(null);
+    try {
+      const fresh = await updateItem<BusinessPlanSection>('business-plan', sectionId, { content: newText });
+      setSections(fresh.sort((a, b) => a.order - b.order));
+      setLastSaved(nowISO());
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save document section');
+    }
   };
 
-  // Save SWOT items helper
-  const saveSwot = (updatedSwot: SwotItem[]) => {
-    setSwotItems(updatedSwot);
-    setItems(STORAGE_KEYS.SWOT, updatedSwot);
-    const now = nowISO();
-    setLastSaved(now);
-    setValue('bp_last_saved', now);
-  };
-
-  const handleSectionTextChange = (sectionId: string, newText: string) => {
-    const updated = sections.map((s) => (s.id === sectionId ? { ...s, content: newText } : s));
-    saveSections(updated);
-  };
-
-  const handleAddSwotItem = (text: string, category: SwotItem['category']) => {
+  const handleAddSwotItem = async (text: string, category: SwotItem['category']) => {
     if (!text.trim()) return;
     const newItem: SwotItem = {
       id: generateId(),
       text: text.trim(),
       category,
     };
-    const updated = [...swotItems, newItem];
-    saveSwot(updated);
 
-    // Clear input
-    if (category === 'strength') setNewStrength('');
-    if (category === 'weakness') setNewWeakness('');
-    if (category === 'opportunity') setNewOpportunity('');
-    if (category === 'threat') setNewThreat('');
+    setError(null);
+    try {
+      const fresh = await addItem<SwotItem>('swot', newItem);
+      setSwotItems(fresh);
+      setLastSaved(nowISO());
+
+      // Clear input
+      if (category === 'strength') setNewStrength('');
+      if (category === 'weakness') setNewWeakness('');
+      if (category === 'opportunity') setNewOpportunity('');
+      if (category === 'threat') setNewThreat('');
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to add SWOT item');
+    }
   };
 
-  const handleDeleteSwotItem = (id: string) => {
-    const updated = swotItems.filter((item) => item.id !== id);
-    saveSwot(updated);
+  const handleDeleteSwotItem = async (id: string) => {
+    setError(null);
+    try {
+      const fresh = await removeItem<SwotItem>('swot', id);
+      setSwotItems(fresh);
+      setLastSaved(nowISO());
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete SWOT item');
+    }
   };
 
 
@@ -96,8 +124,11 @@ export default function BusinessPlanPage() {
   const swotCount = swotItems.length;
   const completionPercentage = Math.round(((sectionsCompleted) / totalSections) * 100);
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
@@ -161,11 +192,11 @@ export default function BusinessPlanPage() {
 
           {currentSection ? (
             <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h4 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--accent-blue)' }}>
-                  Editing: {currentSection.title}
-                </h4>
-                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>
+                  {currentSection.title}
+                </span>
+                <span style={{ fontSize: 'var(--font-size-xxs)', color: 'var(--text-tertiary)' }}>
                   Auto-saved on keystroke
                 </span>
               </div>
@@ -173,7 +204,7 @@ export default function BusinessPlanPage() {
                 id={`textarea-section-${currentSection.id}`}
                 className="form-textarea"
                 value={currentSection.content}
-                onChange={(e) => handleSectionTextChange(currentSection.id, e.target.value)}
+                onChange={(e) => { void handleSectionTextChange(currentSection.id, e.target.value); }}
                 style={{ minHeight: '300px', fontFamily: 'inherit', lineHeight: '1.6', fontSize: 'var(--font-size-sm)', padding: 'var(--space-md)' }}
                 placeholder={`Draft details for ${currentSection.title}...`}
               />
@@ -203,7 +234,7 @@ export default function BusinessPlanPage() {
                       <span>{item.text}</span>
                       <button
                         id={`btn-delete-swot-${item.id}`}
-                        onClick={() => handleDeleteSwotItem(item.id)}
+                        onClick={() => { void handleDeleteSwotItem(item.id); }}
                         style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
                       >
                         ✕
@@ -220,12 +251,12 @@ export default function BusinessPlanPage() {
                     value={newStrength}
                     onChange={(e) => setNewStrength(e.target.value)}
                     style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddSwotItem(newStrength, 'strength')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newStrength, 'strength'); }}
                   />
                   <button
                     id="btn-add-swot-strength"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleAddSwotItem(newStrength, 'strength')}
+                    onClick={() => { void handleAddSwotItem(newStrength, 'strength'); }}
                   >
                     +
                   </button>
@@ -241,7 +272,7 @@ export default function BusinessPlanPage() {
                       <span>{item.text}</span>
                       <button
                         id={`btn-delete-swot-${item.id}`}
-                        onClick={() => handleDeleteSwotItem(item.id)}
+                        onClick={() => { void handleDeleteSwotItem(item.id); }}
                         style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
                       >
                         ✕
@@ -258,12 +289,12 @@ export default function BusinessPlanPage() {
                     value={newWeakness}
                     onChange={(e) => setNewWeakness(e.target.value)}
                     style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddSwotItem(newWeakness, 'weakness')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newWeakness, 'weakness'); }}
                   />
                   <button
                     id="btn-add-swot-weakness"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleAddSwotItem(newWeakness, 'weakness')}
+                    onClick={() => { void handleAddSwotItem(newWeakness, 'weakness'); }}
                   >
                     +
                   </button>
@@ -279,7 +310,7 @@ export default function BusinessPlanPage() {
                       <span>{item.text}</span>
                       <button
                         id={`btn-delete-swot-${item.id}`}
-                        onClick={() => handleDeleteSwotItem(item.id)}
+                        onClick={() => { void handleDeleteSwotItem(item.id); }}
                         style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
                       >
                         ✕
@@ -296,12 +327,12 @@ export default function BusinessPlanPage() {
                     value={newOpportunity}
                     onChange={(e) => setNewOpportunity(e.target.value)}
                     style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddSwotItem(newOpportunity, 'opportunity')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newOpportunity, 'opportunity'); }}
                   />
                   <button
                     id="btn-add-swot-opportunity"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleAddSwotItem(newOpportunity, 'opportunity')}
+                    onClick={() => { void handleAddSwotItem(newOpportunity, 'opportunity'); }}
                   >
                     +
                   </button>
@@ -317,7 +348,7 @@ export default function BusinessPlanPage() {
                       <span>{item.text}</span>
                       <button
                         id={`btn-delete-swot-${item.id}`}
-                        onClick={() => handleDeleteSwotItem(item.id)}
+                        onClick={() => { void handleDeleteSwotItem(item.id); }}
                         style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
                       >
                         ✕
@@ -334,12 +365,12 @@ export default function BusinessPlanPage() {
                     value={newThreat}
                     onChange={(e) => setNewThreat(e.target.value)}
                     style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddSwotItem(newThreat, 'threat')}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newThreat, 'threat'); }}
                   />
                   <button
                     id="btn-add-swot-threat"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleAddSwotItem(newThreat, 'threat')}
+                    onClick={() => { void handleAddSwotItem(newThreat, 'threat'); }}
                   >
                     +
                   </button>

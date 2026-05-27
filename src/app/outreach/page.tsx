@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { getItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems } from '@/lib/storage';
 import { formatNumber, formatDate, getStatusColor, titleCase } from '@/lib/utils';
 import type { OutreachContact, EmailTemplate, Campaign } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 // ---- Inline SVG Icons ----
 
@@ -85,47 +88,67 @@ interface QuickAction {
 }
 
 export default function OutreachDashboardPage() {
-  const [metrics] = useState<MetricData[]>(() => {
-    const contacts = getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS);
-    const templates = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
-    const allCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
+  const [metrics, setMetrics] = useState<MetricData[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const activeCampaigns = allCampaigns.filter(
-      (c) => c.status === 'sending' || c.status === 'scheduled'
-    );
-    const totalSent = allCampaigns.reduce((sum, c) => sum + c.stats.sent, 0);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [contactsData, templatesData, campaignsData] = await Promise.all([
+          getItems<OutreachContact>('outreach-contacts'),
+          getItems<EmailTemplate>('email-templates'),
+          getItems<Campaign>('campaigns'),
+        ]);
 
-    return [
-      {
-        label: 'Total Contacts',
-        value: formatNumber(contacts.length),
-        color: 'blue',
-        icon: <ContactsIcon />,
-      },
-      {
-        label: 'Templates',
-        value: formatNumber(templates.length),
-        color: 'emerald',
-        icon: <TemplateIcon />,
-      },
-      {
-        label: 'Active Campaigns',
-        value: formatNumber(activeCampaigns.length),
-        color: 'amber',
-        icon: <CampaignIcon />,
-      },
-      {
-        label: 'Emails Sent',
-        value: formatNumber(totalSent),
-        color: 'cyan',
-        icon: <EmailIcon />,
-      },
-    ];
-  });
-  const [campaigns] = useState<Campaign[]>(() => {
-    const allCampaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-    return allCampaigns.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  });
+        if (!cancelled) {
+          const activeCampaigns = campaignsData.filter(
+            (c) => c.status === 'sending' || c.status === 'scheduled'
+          );
+          const totalSent = campaignsData.reduce((sum, c) => sum + c.stats.sent, 0);
+
+          setMetrics([
+            {
+              label: 'Total Contacts',
+              value: formatNumber(contactsData.length),
+              color: 'blue',
+              icon: <ContactsIcon />,
+            },
+            {
+              label: 'Templates',
+              value: formatNumber(templatesData.length),
+              color: 'emerald',
+              icon: <TemplateIcon />,
+            },
+            {
+              label: 'Active Campaigns',
+              value: formatNumber(activeCampaigns.length),
+              color: 'amber',
+              icon: <CampaignIcon />,
+            },
+            {
+              label: 'Emails Sent',
+              value: formatNumber(totalSent),
+              color: 'cyan',
+              icon: <EmailIcon />,
+            },
+          ]);
+
+          setCampaigns(campaignsData.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load outreach metrics');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const quickActions: QuickAction[] = [
     {
@@ -160,8 +183,11 @@ export default function OutreachDashboardPage() {
 
 
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">

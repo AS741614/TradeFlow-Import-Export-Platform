@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { getItems, addItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useRef, useEffect } from 'react';
+import { getItems, addItem, removeItem } from '@/lib/storage';
 import { generateId, nowISO, isValidEmail } from '@/lib/utils';
 import { COUNTRIES, DEFAULT_COUNTRY } from '@/lib/constants';
 import { parseCSV, mapParsedDataToContacts, parseJSONContacts } from '@/lib/importers';
 import type { OutreachContact } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const EMPTY_MANUAL_FORM = {
   firstName: '',
@@ -18,7 +21,9 @@ const EMPTY_MANUAL_FORM = {
 };
 
 export default function OutreachContactsPage() {
-  const [contacts, setContacts] = useState<OutreachContact[]>(() => getItems<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS));
+  const [contacts, setContacts] = useState<OutreachContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState('all');
 
@@ -45,6 +50,24 @@ export default function OutreachContactsPage() {
     phone: 4,
     country: 5,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await getItems<OutreachContact>('outreach-contacts');
+        if (!cancelled) setContacts(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load outreach contacts');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filter contacts
   const filtered = contacts.filter((c) => {
@@ -87,15 +110,22 @@ export default function OutreachContactsPage() {
       if (isJson) {
         const parsed = parseJSONContacts(text);
         if (parsed.length > 0) {
-          const updated = [...contacts];
-          parsed.forEach((c) => {
-            if (!updated.some((item) => item.email === c.email)) {
-              updated.push(c);
-              addItem(STORAGE_KEYS.OUTREACH_CONTACTS, c);
+          void (async () => {
+            try {
+              let currentContacts = [...contacts];
+              let addedCount = 0;
+              for (const c of parsed) {
+                if (!currentContacts.some((item) => item.email === c.email)) {
+                  currentContacts = await addItem<OutreachContact>('outreach-contacts', c);
+                  addedCount++;
+                }
+              }
+              setContacts(currentContacts);
+              alert(`Successfully imported ${String(addedCount)} contacts from JSON!`);
+            } catch (err) {
+              setError(err instanceof StorageError ? err.message : 'Failed to import contacts');
             }
-          });
-          setContacts(updated);
-          alert(`Successfully imported ${String(parsed.length)} contacts from JSON!`);
+          })();
         } else {
           alert('Could not parse any valid contacts from the JSON file.');
         }
@@ -159,18 +189,23 @@ export default function OutreachContactsPage() {
     }
   };
 
-  const handleFinalizeImport = () => {
+  const handleFinalizeImport = async () => {
     const imported = mapParsedDataToContacts(csvHeaders, csvRows, mappings, 'csv');
     if (imported.length > 0) {
-      const updated = [...contacts];
-      imported.forEach((c) => {
-        if (!updated.some((item) => item.email === c.email)) {
-          updated.push(c);
-          addItem(STORAGE_KEYS.OUTREACH_CONTACTS, c);
+      try {
+        let currentContacts = [...contacts];
+        let addedCount = 0;
+        for (const c of imported) {
+          if (!currentContacts.some((item) => item.email === c.email)) {
+            currentContacts = await addItem<OutreachContact>('outreach-contacts', c);
+            addedCount++;
+          }
         }
-      });
-      setContacts(updated);
-      alert(`Imported ${String(imported.length)} contacts!`);
+        setContacts(currentContacts);
+        alert(`Imported ${String(addedCount)} contacts!`);
+      } catch (err) {
+        setError(err instanceof StorageError ? err.message : 'Failed to finalize import');
+      }
     } else {
       alert('No contacts were imported. Please check your mapping columns and email validity.');
     }
@@ -178,7 +213,7 @@ export default function OutreachContactsPage() {
   };
 
   // Manual Contact Handlers
-  const handleAddManual = () => {
+  const handleAddManual = async () => {
     const { firstName, lastName, email, company, phone, country, tags } = manualForm;
     if (!email || !isValidEmail(email) || !firstName || !company) {
       alert('First name, company name, and a valid email are required.');
@@ -203,10 +238,14 @@ export default function OutreachContactsPage() {
       campaignHistory: [],
     };
 
-    const updated = addItem<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS, newContact);
-    setContacts(updated);
-    setShowManualModal(false);
-    setManualForm(EMPTY_MANUAL_FORM);
+    try {
+      const updated = await addItem<OutreachContact>('outreach-contacts', newContact);
+      setContacts(updated);
+      setShowManualModal(false);
+      setManualForm(EMPTY_MANUAL_FORM);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to add contact');
+    }
   };
 
   // Bulk actions
@@ -226,19 +265,21 @@ export default function OutreachContactsPage() {
     }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
     if (confirm(`Are you sure you want to delete ${String(selectedIds.length)} selected contacts?`)) {
-      let updated = [...contacts];
-      selectedIds.forEach((id) => {
-        updated = removeItem<OutreachContact>(STORAGE_KEYS.OUTREACH_CONTACTS, id);
-      });
-      setContacts(updated);
-      setSelectedIds([]);
+      try {
+        let currentContacts = [...contacts];
+        for (const id of selectedIds) {
+          currentContacts = await removeItem<OutreachContact>('outreach-contacts', id);
+        }
+        setContacts(currentContacts);
+        setSelectedIds([]);
+      } catch (err) {
+        setError(err instanceof StorageError ? err.message : 'Failed to bulk delete contacts');
+      }
     }
   };
-
-
 
   return (
     <div className="animate-fade-in">
@@ -265,164 +306,172 @@ export default function OutreachContactsPage() {
         <p>Import and filter target buyers, distributors, and sourcing managers for email outreach campaigns.</p>
       </div>
 
-      {/* Dynamic Column Mapping UI */}
-      {importPhase === 'mapping' && (
-        <div className="card animate-slide-down" style={{ marginBottom: 'var(--space-xl)', borderColor: 'var(--accent-blue)' }}>
-          <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--accent-blue)', marginBottom: 'var(--space-md)' }}>
-            ⚙️ Map CSV Columns to Contact Attributes
-          </h3>
-          <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>
-            We detected these columns in your CSV. Select which column corresponds to each field below:
-          </p>
+      {error && <ErrorBanner message={error} />}
 
-          <div className="grid-3" style={{ gap: 'var(--space-md)' }}>
-            {['firstName', 'lastName', 'email', 'company', 'phone', 'country'].map((field) => (
-              <div key={field} className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ textTransform: 'capitalize' }}>{field.replace(/([A-Z])/g, ' $1')}</label>
+      {loading ? (
+        <Loading />
+      ) : (
+        <>
+          {/* Dynamic Column Mapping UI */}
+          {importPhase === 'mapping' && (
+            <div className="card animate-slide-down" style={{ marginBottom: 'var(--space-xl)', borderColor: 'var(--accent-blue)' }}>
+              <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--accent-blue)', marginBottom: 'var(--space-md)' }}>
+                ⚙️ Map CSV Columns to Contact Attributes
+              </h3>
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)' }}>
+                We detected these columns in your CSV. Select which column corresponds to each field below:
+              </p>
+
+              <div className="grid-3" style={{ gap: 'var(--space-md)' }}>
+                {['firstName', 'lastName', 'email', 'company', 'phone', 'country'].map((field) => (
+                  <div key={field} className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ textTransform: 'capitalize' }}>{field.replace(/([A-Z])/g, ' $1')}</label>
+                    <select
+                      id={`select-map-field-${field}`}
+                      className="form-select"
+                      value={mappings[field]}
+                      onChange={(e) => setMappings({ ...mappings, [field]: parseInt(e.target.value) })}
+                    >
+                      {csvHeaders.map((header, idx) => (
+                        <option key={idx} value={idx}>{header} (col {idx + 1})</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)', marginTop: 'var(--space-lg)' }}>
+                <button id="btn-cancel-mapping" className="btn btn-secondary" onClick={() => setImportPhase('idle')}>Cancel</button>
+                <button id="btn-confirm-mapping" className="btn btn-primary" onClick={() => { void handleFinalizeImport(); }}>Import {String(csvRows.length)} Contacts</button>
+              </div>
+            </div>
+          )}
+
+          {/* Drop Zone (Hidden if mapping is active) */}
+          {importPhase === 'idle' && contacts.length === 0 && (
+            <div
+              id="drop-zone-contacts"
+              className={`drop-zone ${dragActive ? 'drag-over' : ''}`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              style={{ marginBottom: 'var(--space-xl)' }}
+            >
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p>
+                Drag & drop your <span className="drop-zone-highlight">CSV or JSON</span> contact file here, or click to browse.
+              </p>
+              <p style={{ fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', color: 'var(--text-tertiary)' }}>
+                Headers should ideally include: First Name, Last Name, Email, Company, Country
+              </p>
+            </div>
+          )}
+
+          {/* Filters Hub & Search */}
+          <div className="card" style={{ marginBottom: 'var(--space-lg)', padding: 'var(--space-md)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-md)', flex: 1, minWidth: '300px' }}>
+                <input
+                  id="input-outreach-contacts-search"
+                  className="form-input"
+                  type="text"
+                  placeholder="Search contact database..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ flex: 2 }}
+                />
                 <select
-                  id={`select-map-field-${field}`}
+                  id="select-filter-outreach-tag"
                   className="form-select"
-                  value={mappings[field]}
-                  onChange={(e) => setMappings({ ...mappings, [field]: parseInt(e.target.value) })}
+                  value={tagFilter}
+                  onChange={(e) => setTagFilter(e.target.value)}
+                  style={{ flex: 1 }}
                 >
-                  {csvHeaders.map((header, idx) => (
-                    <option key={idx} value={idx}>{header} (col {idx + 1})</option>
+                  <option value="all">All Tags</option>
+                  {allTags.map((tag) => (
+                    <option key={tag} value={tag}>{tag}</option>
                   ))}
                 </select>
               </div>
-            ))}
+
+              {selectedIds.length > 0 && (
+                <button id="btn-bulk-delete-contacts" className="btn btn-danger" onClick={() => { void handleBulkDelete(); }}>
+                  🗑️ Delete Selected ({String(selectedIds.length)})
+                </button>
+              )}
+            </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)', marginTop: 'var(--space-lg)' }}>
-            <button id="btn-cancel-mapping" className="btn btn-secondary" onClick={() => setImportPhase('idle')}>Cancel</button>
-            <button id="btn-confirm-mapping" className="btn btn-primary" onClick={handleFinalizeImport}>Import {csvRows.length} Contacts</button>
-          </div>
-        </div>
-      )}
+          {/* Directory Table */}
+          <div className="data-table-wrapper">
+            <div className="data-table-header">
+              <h3>{String(filtered.length)} Registered Outreach Contact{filtered.length !== 1 ? 's' : ''}</h3>
+            </div>
 
-      {/* Drop Zone (Hidden if mapping is active) */}
-      {importPhase === 'idle' && contacts.length === 0 && (
-        <div
-          id="drop-zone-contacts"
-          className={`drop-zone ${dragActive ? 'drag-over' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          style={{ marginBottom: 'var(--space-xl)' }}
-        >
-          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>
-            Drag & drop your <span className="drop-zone-highlight">CSV or JSON</span> contact file here, or click to browse.
-          </p>
-          <p style={{ fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-xs)', color: 'var(--text-tertiary)' }}>
-            Headers should ideally include: First Name, Last Name, Email, Company, Country
-          </p>
-        </div>
-      )}
-
-      {/* Filters Hub & Search */}
-      <div className="card" style={{ marginBottom: 'var(--space-lg)', padding: 'var(--space-md)' }}>
-        <div style={{ display: 'flex', gap: 'var(--space-md)', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-md)', flex: 1, minWidth: '300px' }}>
-            <input
-              id="input-outreach-contacts-search"
-              className="form-input"
-              type="text"
-              placeholder="Search contact database..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ flex: 2 }}
-            />
-            <select
-              id="select-filter-outreach-tag"
-              className="form-select"
-              value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              style={{ flex: 1 }}
-            >
-              <option value="all">All Tags</option>
-              {allTags.map((tag) => (
-                <option key={tag} value={tag}>{tag}</option>
-              ))}
-            </select>
-          </div>
-
-          {selectedIds.length > 0 && (
-            <button id="btn-bulk-delete-contacts" className="btn btn-danger" onClick={handleBulkDelete}>
-              🗑️ Delete Selected ({selectedIds.length})
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Directory Table */}
-      <div className="data-table-wrapper">
-        <div className="data-table-header">
-          <h3>{filtered.length} Registered Outreach Contact{filtered.length !== 1 ? 's' : ''}</h3>
-        </div>
-
-        {filtered.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 40 }}>
-                  <input
-                    id="checkbox-select-all"
-                    type="checkbox"
-                    checked={filtered.length > 0 && selectedIds.length === filtered.length}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                  />
-                </th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Company</th>
-                <th>Country</th>
-                <th>Source</th>
-                <th>Tags</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="stagger-item">
-                  <td>
-                    <input
-                      id={`checkbox-select-${c.id}`}
-                      type="checkbox"
-                      checked={selectedIds.includes(c.id)}
-                      onChange={(e) => handleSelectOne(c.id, e.target.checked)}
-                    />
-                  </td>
-                  <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{c.firstName} {c.lastName}</td>
-                  <td>{c.email}</td>
-                  <td>{c.company}</td>
-                  <td>{c.country}</td>
-                  <td>
-                    <span style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase' }}>
-                      {c.source}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {c.tags.map((t, idx) => (
-                        <span key={idx} className="tag tag-blue">
-                          {t}
+            {filtered.length > 0 ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 40 }}>
+                      <input
+                        id="checkbox-select-all"
+                        type="checkbox"
+                        checked={filtered.length > 0 && selectedIds.length === filtered.length}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                      />
+                    </th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Company</th>
+                    <th>Country</th>
+                    <th>Source</th>
+                    <th>Tags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((c) => (
+                    <tr key={c.id} className="stagger-item">
+                      <td>
+                        <input
+                          id={`checkbox-select-${c.id}`}
+                          type="checkbox"
+                          checked={selectedIds.includes(c.id)}
+                          onChange={(e) => handleSelectOne(c.id, e.target.checked)}
+                        />
+                      </td>
+                      <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{c.firstName} {c.lastName}</td>
+                      <td>{c.email}</td>
+                      <td>{c.company}</td>
+                      <td>{c.country}</td>
+                      <td>
+                        <span style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase' }}>
+                          {c.source}
                         </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="data-table-empty">
-            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-            <p>No outreach contacts in database. Import files or add manually to trigger campaigns.</p>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {c.tags.map((t, idx) => (
+                            <span key={idx} className="tag tag-blue">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="data-table-empty">
+                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                <p>No outreach contacts in database. Import files or add manually to trigger campaigns.</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Manual Contact Modal */}
       {showManualModal && (
@@ -531,7 +580,7 @@ export default function OutreachContactsPage() {
               <button
                 id="btn-save-manual"
                 className="btn btn-primary"
-                onClick={handleAddManual}
+                onClick={() => { void handleAddManual(); }}
                 disabled={!manualForm.email.trim() || !manualForm.firstName.trim() || !manualForm.company.trim()}
               >
                 Save Contact

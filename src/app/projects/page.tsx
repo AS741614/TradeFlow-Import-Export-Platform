@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback, type DragEvent, type SubmitEvent } from 'react';
-import { getItems, addItem, setItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect, type DragEvent, type SubmitEvent } from 'react';
+import { getItems, addItem, updateItem } from '@/lib/storage';
 import { generateId, nowISO, formatDate } from '@/lib/utils';
 import { getDefaultTasks } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 // ---- Column configuration ----
 
@@ -92,19 +95,44 @@ const EMPTY_FORM: NewTaskForm = {
 // ============================================================
 
 export default function ProjectsPage() {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    let stored = getItems<Task>(STORAGE_KEYS.TASKS);
-    if (stored.length === 0) {
-      const defaults = getDefaultTasks();
-      setItems(STORAGE_KEYS.TASKS, defaults);
-      stored = defaults;
-    }
-    return stored;
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewTaskForm>(EMPTY_FORM);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        let stored = await getItems<Task>('tasks');
+        if (stored.length === 0) {
+          const defaults = getDefaultTasks();
+          for (const item of defaults) {
+            await addItem<Task>('tasks', item);
+          }
+          stored = await getItems<Task>('tasks');
+        }
+        if (!cancelled) {
+          setTasks(stored);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof StorageError ? err.message : 'Failed to load tasks');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // ---- Derived metrics ----
 
@@ -144,18 +172,17 @@ export default function ProjectsPage() {
   }, []);
 
   const handleDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>, targetStatus: TaskStatus) => {
+    async (e: DragEvent<HTMLDivElement>, targetStatus: TaskStatus) => {
       e.preventDefault();
       const taskId = e.dataTransfer.getData('text/plain');
       if (!taskId) return;
 
-      setTasks((prev) => {
-        const updated = prev.map((t) =>
-          t.id === taskId ? { ...t, status: targetStatus, updatedAt: nowISO() } : t,
-        );
-        setItems(STORAGE_KEYS.TASKS, updated);
-        return updated;
-      });
+      try {
+        const fresh = await updateItem<Task>('tasks', taskId, { status: targetStatus, updatedAt: nowISO() });
+        setTasks(fresh);
+      } catch (err) {
+        setError(err instanceof StorageError ? err.message : 'Failed to update task status');
+      }
 
       setDraggingId(null);
       setDragOverColumn(null);
@@ -166,7 +193,7 @@ export default function ProjectsPage() {
   // ---- Add task handler ----
 
   const handleAddTask = useCallback(
-    (e: SubmitEvent<HTMLFormElement>) => {
+    async (e: SubmitEvent<HTMLFormElement>) => {
       e.preventDefault();
       if (!form.title.trim()) return;
 
@@ -188,15 +215,17 @@ export default function ProjectsPage() {
         updatedAt: now,
       };
 
-      const updated = addItem<Task>(STORAGE_KEYS.TASKS, newTask);
-      setTasks(updated);
-      setForm(EMPTY_FORM);
-      setShowModal(false);
+      try {
+        const updated = await addItem<Task>('tasks', newTask);
+        setTasks(updated);
+        setForm(EMPTY_FORM);
+        setShowModal(false);
+      } catch (err) {
+        setError(err instanceof StorageError ? err.message : 'Failed to add task');
+      }
     },
     [form],
   );
-
-
 
   // ---- Render ----
 
@@ -281,92 +310,97 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* ---- Kanban Board ---- */}
-      <div className="kanban-board">
-        {COLUMNS.map((col) => {
-          const columnTasks = tasksByStatus(col.id);
-          return (
-            <div
-              key={col.id}
-              id={`kanban-column-${col.id}`}
-              className="kanban-column"
-              style={{
-                borderColor: dragOverColumn === col.id ? 'var(--accent-blue)' : undefined,
-                background: dragOverColumn === col.id ? 'var(--accent-blue-bg)' : undefined,
-                transition: 'border-color 200ms ease, background 200ms ease',
-              }}
-              onDragOver={(e) => handleDragOver(e, col.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, col.id)}
-            >
-              {/* Column header */}
-              <div className="kanban-column-header">
-                <div className="kanban-column-title">
-                  {col.icon}
-                  {col.title}
-                </div>
-                <span className="kanban-column-count">{columnTasks.length}</span>
-              </div>
+      {error && <ErrorBanner message={error} />}
 
-              {/* Task cards */}
-              {columnTasks.map((task) => (
-                <div
-                  key={task.id}
-                  id={`kanban-card-${task.id}`}
-                  className={`kanban-card stagger-item${draggingId === task.id ? ' dragging' : ''}`}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, task.id)}
-                  onDragEnd={handleDragEnd}
-                >
-                  <div className="kanban-card-title">{task.title}</div>
-                  <div className="kanban-card-meta">
-                    <span className={`tag tag-blue`} style={{ fontSize: 'var(--font-size-xs)' }}>
-                      {task.category}
-                    </span>
-                    <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>
-                      {task.priority}
-                    </span>
+      {loading ? (
+        <Loading />
+      ) : (
+        <div className="kanban-board">
+          {COLUMNS.map((col) => {
+            const columnTasks = tasksByStatus(col.id);
+            return (
+              <div
+                key={col.id}
+                id={`kanban-column-${col.id}`}
+                className="kanban-column"
+                style={{
+                  borderColor: dragOverColumn === col.id ? 'var(--accent-blue)' : undefined,
+                  background: dragOverColumn === col.id ? 'var(--accent-blue-bg)' : undefined,
+                  transition: 'border-color 200ms ease, background 200ms ease',
+                }}
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => { void handleDrop(e, col.id); }}
+              >
+                {/* Column header */}
+                <div className="kanban-column-header">
+                  <div className="kanban-column-title">
+                    {col.icon}
+                    {col.title}
                   </div>
-                  {task.dueDate && (
-                    <div
-                      style={{
-                        marginTop: 'var(--space-sm)',
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--text-tertiary)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-xs)',
-                      }}
-                    >
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                        <line x1="16" y1="2" x2="16" y2="6" />
-                        <line x1="8" y1="2" x2="8" y2="6" />
-                        <line x1="3" y1="10" x2="21" y2="10" />
-                      </svg>
-                      {formatDate(task.dueDate)}
-                    </div>
-                  )}
+                  <span className="kanban-column-count">{columnTasks.length}</span>
                 </div>
-              ))}
 
-              {/* Empty column state */}
-              {columnTasks.length === 0 && (
-                <div
-                  style={{
-                    padding: 'var(--space-xl)',
-                    textAlign: 'center',
-                    color: 'var(--text-tertiary)',
-                    fontSize: 'var(--font-size-xs)',
-                  }}
-                >
-                  Drop tasks here
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {/* Task cards */}
+                {columnTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    id={`kanban-card-${task.id}`}
+                    className={`kanban-card stagger-item${draggingId === task.id ? ' dragging' : ''}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, task.id)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="kanban-card-title">{task.title}</div>
+                    <div className="kanban-card-meta">
+                      <span className={`tag tag-blue`} style={{ fontSize: 'var(--font-size-xs)' }}>
+                        {task.category}
+                      </span>
+                      <span className={`badge ${getPriorityBadgeClass(task.priority)}`}>
+                        {task.priority}
+                      </span>
+                    </div>
+                    {task.dueDate && (
+                      <div
+                        style={{
+                          marginTop: 'var(--space-sm)',
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--text-tertiary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-xs)',
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" />
+                          <line x1="8" y1="2" x2="8" y2="6" />
+                          <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        {formatDate(task.dueDate)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Empty column state */}
+                {columnTasks.length === 0 && (
+                  <div
+                    style={{
+                      padding: 'var(--space-xl)',
+                      textAlign: 'center',
+                      color: 'var(--text-tertiary)',
+                      fontSize: 'var(--font-size-xs)',
+                    }}
+                  >
+                    Drop tasks here
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ---- Add Task Modal ---- */}
       {showModal && (
@@ -386,7 +420,7 @@ export default function ProjectsPage() {
               </button>
             </div>
 
-            <form onSubmit={handleAddTask}>
+            <form onSubmit={(e) => { void handleAddTask(e); }}>
               <div className="modal-body">
                 {/* Title */}
                 <div className="form-group">

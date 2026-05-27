@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { getItems, setItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems, addItem } from '@/lib/storage';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 import { getSampleProducts, getSampleContacts, getDefaultTasks } from '@/lib/constants';
 import type { Product, Contact, Task, Shipment, Invoice, Campaign } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 interface MetricData {
   label: string;
@@ -28,60 +31,93 @@ function MetricIcon({ name }: { name: string }) {
 }
 
 export default function DashboardPage() {
-  const [metrics] = useState<MetricData[]>(() => {
-    // Seed data on first load if empty
-    let products = getItems<Product>(STORAGE_KEYS.PRODUCTS);
-    if (products.length === 0) {
-      const samples = getSampleProducts();
-      setItems(STORAGE_KEYS.PRODUCTS, samples);
-      products = samples;
+  const [metrics, setMetrics] = useState<MetricData[]>([]);
+  const [urgentTasks, setUrgentTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        let products = await getItems<Product>('products');
+        if (products.length === 0) {
+          const samples = getSampleProducts();
+          const seeded: Product[] = [];
+          for (const item of samples) {
+            const added = await addItem<Product>('products', item);
+            seeded.splice(0, seeded.length, ...added);
+          }
+          products = seeded;
+        }
+
+        let contacts = await getItems<Contact>('contacts');
+        if (contacts.length === 0) {
+          const samples = getSampleContacts();
+          const seeded: Contact[] = [];
+          for (const item of samples) {
+            const added = await addItem<Contact>('contacts', item);
+            seeded.splice(0, seeded.length, ...added);
+          }
+          contacts = seeded;
+        }
+
+        let tasks = await getItems<Task>('tasks');
+        if (tasks.length === 0) {
+          const defaults = getDefaultTasks();
+          const seeded: Task[] = [];
+          for (const item of defaults) {
+            const added = await addItem<Task>('tasks', item);
+            seeded.splice(0, seeded.length, ...added);
+          }
+          tasks = seeded;
+        }
+
+        const [shipments, invoices, campaigns] = await Promise.all([
+          getItems<Shipment>('shipments'),
+          getItems<Invoice>('invoices'),
+          getItems<Campaign>('campaigns'),
+        ]);
+
+        if (!cancelled) {
+          const lowStock = products.filter(p => p.status === 'low-stock' || p.status === 'out-of-stock').length;
+          const activeShipments = shipments.filter(s => s.status !== 'delivered').length;
+          const pendingInvoices = invoices.filter(i => i.status === 'draft' || i.status === 'sent').length;
+          const completedTasks = tasks.filter(t => t.status === 'done').length;
+          const totalEmailsSent = campaigns.reduce((sum, c) => sum + c.stats.sent, 0);
+
+          setMetrics([
+            { label: 'Total Products', value: formatNumber(products.length), color: 'blue', icon: <MetricIcon name="products" /> },
+            { label: 'Active Shipments', value: formatNumber(activeShipments), color: 'cyan', icon: <MetricIcon name="shipments" /> },
+            { label: 'Pending Invoices', value: formatNumber(pendingInvoices), color: 'amber', icon: <MetricIcon name="invoices" /> },
+            { label: 'Total Contacts', value: formatNumber(contacts.length), color: 'purple', icon: <MetricIcon name="contacts" /> },
+            { label: 'Tasks Completed', value: `${String(completedTasks)}/${String(tasks.length)}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
+            { label: 'Low Stock Alerts', value: formatNumber(lowStock), color: 'red', icon: <MetricIcon name="alert" /> },
+            { label: 'Emails Sent', value: formatNumber(totalEmailsSent), color: 'blue', icon: <MetricIcon name="email" /> },
+            { label: 'Revenue (Est.)', value: formatCurrency(0), color: 'emerald', icon: <MetricIcon name="revenue" /> },
+          ]);
+
+          setUrgentTasks(tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5));
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load dashboard metrics');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-
-    let contacts = getItems<Contact>(STORAGE_KEYS.CONTACTS);
-    if (contacts.length === 0) {
-      const samples = getSampleContacts();
-      setItems(STORAGE_KEYS.CONTACTS, samples);
-      contacts = samples;
-    }
-
-    let tasks = getItems<Task>(STORAGE_KEYS.TASKS);
-    if (tasks.length === 0) {
-      const defaults = getDefaultTasks();
-      setItems(STORAGE_KEYS.TASKS, defaults);
-      tasks = defaults;
-    }
-
-    const shipments = getItems<Shipment>(STORAGE_KEYS.SHIPMENTS);
-    const invoices = getItems<Invoice>(STORAGE_KEYS.INVOICES);
-    const campaigns = getItems<Campaign>(STORAGE_KEYS.CAMPAIGNS);
-
-    const lowStock = products.filter(p => p.status === 'low-stock' || p.status === 'out-of-stock').length;
-    const activeShipments = shipments.filter(s => s.status !== 'delivered').length;
-    const pendingInvoices = invoices.filter(i => i.status === 'draft' || i.status === 'sent').length;
-    const completedTasks = tasks.filter(t => t.status === 'done').length;
-    const totalEmailsSent = campaigns.reduce((sum, c) => sum + c.stats.sent, 0);
-
-    return [
-      { label: 'Total Products', value: formatNumber(products.length), color: 'blue', icon: <MetricIcon name="products" /> },
-      { label: 'Active Shipments', value: formatNumber(activeShipments), color: 'cyan', icon: <MetricIcon name="shipments" /> },
-      { label: 'Pending Invoices', value: formatNumber(pendingInvoices), color: 'amber', icon: <MetricIcon name="invoices" /> },
-      { label: 'Total Contacts', value: formatNumber(contacts.length), color: 'purple', icon: <MetricIcon name="contacts" /> },
-      { label: 'Tasks Completed', value: `${String(completedTasks)}/${String(tasks.length)}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
-      { label: 'Low Stock Alerts', value: formatNumber(lowStock), color: 'red', icon: <MetricIcon name="alert" /> },
-      { label: 'Emails Sent', value: formatNumber(totalEmailsSent), color: 'blue', icon: <MetricIcon name="email" /> },
-      { label: 'Revenue (Est.)', value: formatCurrency(0), color: 'emerald', icon: <MetricIcon name="revenue" /> },
-    ];
-  });
-
-  const [urgentTasks] = useState<Task[]>(() => {
-    const tasks = getItems<Task>(STORAGE_KEYS.TASKS);
-    return tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5);
-  });
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
 
+
+  if (loading) return <Loading />;
 
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">

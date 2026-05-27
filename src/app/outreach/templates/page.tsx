@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, setItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, nowISO } from '@/lib/utils';
 import { EMAIL_TEMPLATE_PRESETS } from '@/lib/constants';
 import { extractVariables, renderTemplate } from '@/lib/templateEngine';
 import type { EmailTemplate, TemplateCategory } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const EMPTY_FORM = {
   name: '',
@@ -47,34 +50,52 @@ const SAMPLE_CUSTOM_VARS = {
 };
 
 export default function OutreachTemplatesPage() {
-  const [templates, setTemplates] = useState<EmailTemplate[]>(() => {
-    let stored = getItems<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES);
-
-    // Seed preset templates on first load
-    if (stored.length === 0) {
-      const seeded = EMAIL_TEMPLATE_PRESETS.map((preset) => {
-        const combinedText = `${preset.subject} ${preset.body}`;
-        const variables = extractVariables(combinedText);
-        
-        return {
-          id: generateId(),
-          name: preset.name,
-          category: preset.category,
-          subject: preset.subject,
-          body: preset.body,
-          variables,
-          createdAt: nowISO(),
-          updatedAt: nowISO(),
-        };
-      });
-      setItems(STORAGE_KEYS.EMAIL_TEMPLATES, seeded);
-      stored = seeded;
-    }
-    return stored;
-  });
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        let stored = await getItems<EmailTemplate>('email-templates');
+        // Seed preset templates on first load
+        if (stored.length === 0) {
+          const seeded = EMAIL_TEMPLATE_PRESETS.map((preset) => {
+            const combinedText = `${preset.subject} ${preset.body}`;
+            const variables = extractVariables(combinedText);
+            
+            return {
+              id: generateId(),
+              name: preset.name,
+              category: preset.category,
+              subject: preset.subject,
+              body: preset.body,
+              variables,
+              createdAt: nowISO(),
+              updatedAt: nowISO(),
+            };
+          });
+          for (const item of seeded) {
+            await addItem<EmailTemplate>('email-templates', item);
+          }
+          stored = await getItems<EmailTemplate>('email-templates');
+        }
+        if (!cancelled) setTemplates(stored);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load email templates');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openAdd = useCallback(() => {
     setEditingId(null);
@@ -117,37 +138,45 @@ export default function OutreachTemplatesPage() {
     setForm((prev) => ({ ...prev, body: text }));
   };
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!form.name.trim() || !form.subject.trim() || !form.body.trim()) return;
 
     const combinedText = `${form.subject} ${form.body}`;
     const variables = extractVariables(combinedText);
     const now = nowISO();
 
-    if (editingId) {
-      const updated = updateItem<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES, editingId, {
-        ...form,
-        variables,
-        updatedAt: now,
-      });
-      setTemplates(updated);
-    } else {
-      const newTemplate: EmailTemplate = {
-        id: generateId(),
-        ...form,
-        variables,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const updated = addItem<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES, newTemplate);
-      setTemplates(updated);
+    try {
+      if (editingId) {
+        const updated = await updateItem<EmailTemplate>('email-templates', editingId, {
+          ...form,
+          variables,
+          updatedAt: now,
+        });
+        setTemplates(updated);
+      } else {
+        const newTemplate: EmailTemplate = {
+          id: generateId(),
+          ...form,
+          variables,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const updated = await addItem<EmailTemplate>('email-templates', newTemplate);
+        setTemplates(updated);
+      }
+      closeModal();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save template');
     }
-    closeModal();
   }, [form, editingId, closeModal]);
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = removeItem<EmailTemplate>(STORAGE_KEYS.EMAIL_TEMPLATES, id);
-    setTemplates(updated);
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      const updated = await removeItem<EmailTemplate>('email-templates', id);
+      setTemplates(updated);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete template');
+    }
   }, []);
 
   const updateField = useCallback(
@@ -156,8 +185,6 @@ export default function OutreachTemplatesPage() {
     },
     []
   );
-
-
 
   // Pre-render Subject and Body previews
   const previewSubject = renderTemplate(form.subject, SAMPLE_CONTACT, SAMPLE_CUSTOM_VARS);
@@ -178,52 +205,58 @@ export default function OutreachTemplatesPage() {
         <p>Manage and draft personalized HTML email templates with dynamic template tokens.</p>
       </div>
 
-      {/* Templates Grid List */}
-      <div className="grid-3" style={{ gap: 'var(--space-lg)' }}>
-        {templates.map((t) => (
-          <div key={t.id} className="card stagger-item" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '200px' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-sm)' }}>
-                <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>{t.name}</h3>
-                <span className="badge status-info" style={{ textTransform: 'capitalize' }}>
-                  {t.category}
-                </span>
-              </div>
-              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
-                <strong>Subject:</strong> {t.subject}
-              </p>
-              
-              {/* Dynamic Tokens List */}
-              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: 'var(--space-sm)' }}>
-                {t.variables.map((v) => (
-                  <span key={v} style={{ fontSize: '9px', background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: '4px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
-                    {"{{" + v + "}}"}
-                  </span>
-                ))}
-              </div>
-            </div>
+      {error && <ErrorBanner message={error} />}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-xs)', borderTop: '1px solid var(--border-subtle)', marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)' }}>
-              <button
-                id={`btn-edit-template-${t.id}`}
-                className="btn btn-ghost btn-sm btn-icon"
-                onClick={() => openEdit(t)}
-                title="Edit Template"
-              >
-                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-              </button>
-              <button
-                id={`btn-delete-template-${t.id}`}
-                className="btn btn-danger btn-sm btn-icon"
-                onClick={() => handleDelete(t.id)}
-                title="Delete Template"
-              >
-                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-              </button>
+      {loading ? (
+        <Loading />
+      ) : (
+        /* Templates Grid List */
+        <div className="grid-3" style={{ gap: 'var(--space-lg)' }}>
+          {templates.map((t) => (
+            <div key={t.id} className="card stagger-item" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '200px' }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-sm)' }}>
+                  <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)' }}>{t.name}</h3>
+                  <span className="badge status-info" style={{ textTransform: 'capitalize' }}>
+                    {t.category}
+                  </span>
+                </div>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
+                  <strong>Subject:</strong> {t.subject}
+                </p>
+                
+                {/* Dynamic Tokens List */}
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: 'var(--space-sm)' }}>
+                  {t.variables.map((v) => (
+                    <span key={v} style={{ fontSize: '9px', background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: '4px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
+                      {"{{" + v + "}}"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-xs)', borderTop: '1px solid var(--border-subtle)', marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)' }}>
+                <button
+                  id={`btn-edit-template-${t.id}`}
+                  className="btn btn-ghost btn-sm btn-icon"
+                  onClick={() => openEdit(t)}
+                  title="Edit Template"
+                >
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                </button>
+                <button
+                  id={`btn-delete-template-${t.id}`}
+                  className="btn btn-danger btn-sm btn-icon"
+                  onClick={() => { void handleDelete(t.id); }}
+                  title="Delete Template"
+                >
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Large Edit / Create Template Modal */}
       {showModal && (
@@ -350,7 +383,7 @@ export default function OutreachTemplatesPage() {
               <button
                 id="btn-save-template"
                 className="btn btn-primary"
-                onClick={handleSubmit}
+                onClick={() => { void handleSubmit(); }}
                 disabled={!form.name.trim() || !form.subject.trim() || !form.body.trim()}
               >
                 {editingId ? 'Update Template' : 'Save Template'}

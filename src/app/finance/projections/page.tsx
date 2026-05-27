@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, setItems, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { formatCurrency, generateId } from '@/lib/utils';
 import type { FinancialProjection } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 // ---- Month labels for dropdown ----
 const MONTHS = [
@@ -14,7 +17,9 @@ const MONTHS = [
 const currentYear = new Date().getFullYear();
 
 export default function ProjectionsPage() {
-  const [projections, setProjections] = useState<FinancialProjection[]>(() => getItems<FinancialProjection>(STORAGE_KEYS.PROJECTIONS));
+  const [projections, setProjections] = useState<FinancialProjection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -22,9 +27,22 @@ export default function ProjectionsPage() {
   const [formRevenue, setFormRevenue] = useState('');
   const [formExpenses, setFormExpenses] = useState('');
 
-  const persist = useCallback((items: FinancialProjection[]) => {
-    setProjections(items);
-    setItems(STORAGE_KEYS.PROJECTIONS, items);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await getItems<FinancialProjection>('financial-projections');
+        if (!cancelled) setProjections(data);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load projections');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const resetForm = () => {
@@ -34,30 +52,42 @@ export default function ProjectionsPage() {
     setFormExpenses('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const revenue = parseFloat(formRevenue) || 0;
     const expenses = parseFloat(formExpenses) || 0;
     const profit = revenue - expenses;
 
-    if (editingId) {
-      // Update existing
-      const updated = projections.map((p) =>
-        p.id === editingId ? { ...p, month: formMonth, revenue, expenses, profit } : p,
-      );
-      persist(updated);
-    } else {
-      // Add new
-      const newItem: FinancialProjection = {
-        id: generateId(),
-        month: formMonth,
-        revenue,
-        expenses,
-        profit,
-        currency: 'USD',
-      };
-      persist([...projections, newItem]);
+    setLoading(true);
+    setError(null);
+    try {
+      if (editingId) {
+        // Update existing
+        const fresh = await updateItem<FinancialProjection>('financial-projections', editingId, {
+          month: formMonth,
+          revenue,
+          expenses,
+          profit,
+        });
+        setProjections(fresh);
+      } else {
+        // Add new
+        const newItem: FinancialProjection = {
+          id: generateId(),
+          month: formMonth,
+          revenue,
+          expenses,
+          profit,
+          currency: 'USD',
+        };
+        const fresh = await addItem<FinancialProjection>('financial-projections', newItem);
+        setProjections(fresh);
+      }
+      resetForm();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save projection');
+    } finally {
+      setLoading(false);
     }
-    resetForm();
   };
 
   const handleEdit = (item: FinancialProjection) => {
@@ -67,9 +97,18 @@ export default function ProjectionsPage() {
     setFormExpenses(item.expenses.toString());
   };
 
-  const handleDelete = (id: string) => {
-    persist(projections.filter((p) => p.id !== id));
-    if (editingId === id) resetForm();
+  const handleDelete = async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const fresh = await removeItem<FinancialProjection>('financial-projections', id);
+      setProjections(fresh);
+      if (editingId === id) resetForm();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete projection');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ---- Summary calculations ----
@@ -94,8 +133,11 @@ export default function ProjectionsPage() {
 
 
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
@@ -216,7 +258,7 @@ export default function ProjectionsPage() {
             />
           </div>
           <div className="form-group" style={{ display: 'flex', gap: 'var(--space-sm)' }}>
-            <button id="proj-save-btn" className="btn btn-primary" onClick={handleSave}>
+            <button id="proj-save-btn" className="btn btn-primary" onClick={() => { void handleSave(); }}>
               {editingId ? 'Update' : 'Add'}
             </button>
             {editingId && (
@@ -274,7 +316,7 @@ export default function ProjectionsPage() {
                       <button
                         id={`proj-delete-${p.id}`}
                         className="btn btn-danger btn-sm"
-                        onClick={() => handleDelete(p.id)}
+                        onClick={() => { void handleDelete(p.id); }}
                       >
                         <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
                           <polyline points="3 6 5 6 21 6" />

@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { COUNTRIES, CARRIERS, DEFAULT_COUNTRY, DEFAULT_DESTINATION_COUNTRY, DEFAULT_CARRIER } from '@/lib/constants';
 import type { Shipment, ShipmentStatus, Product, ShipmentProduct } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const STATUS_FLOW: ShipmentStatus[] = ['ordered', 'shipped', 'in-transit', 'customs', 'delivered'];
 
@@ -21,8 +24,10 @@ const EMPTY_FORM = {
 };
 
 export default function ShipmentsPage() {
-  const [shipments, setShipments] = useState<Shipment[]>(() => getItems<Shipment>(STORAGE_KEYS.SHIPMENTS));
-  const [products] = useState<Product[]>(() => getItems<Product>(STORAGE_KEYS.PRODUCTS));
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -31,6 +36,30 @@ export default function ShipmentsPage() {
   // For adding products to the shipment
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedProductQty, setSelectedProductQty] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [shipmentsData, productsData] = await Promise.all([
+          getItems<Shipment>('shipments'),
+          getItems<Product>('products'),
+        ]);
+        if (!cancelled) {
+          setShipments(shipmentsData);
+          setProducts(productsData);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load shipments');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = shipments.filter((s) => {
     const q = search.toLowerCase();
@@ -75,34 +104,50 @@ export default function ShipmentsPage() {
     setForm(EMPTY_FORM);
   }, []);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!form.reference.trim()) return;
 
     const now = nowISO();
+    setLoading(true);
+    setError(null);
 
-    if (editingId) {
-      const updated = updateItem<Shipment>(STORAGE_KEYS.SHIPMENTS, editingId, {
-        ...form,
-        updatedAt: now,
-      });
-      setShipments(updated);
-    } else {
-      const newShipment: Shipment = {
-        id: generateId(),
-        ...form,
-        documents: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      const updated = addItem<Shipment>(STORAGE_KEYS.SHIPMENTS, newShipment);
-      setShipments(updated);
+    try {
+      if (editingId) {
+        const updated = await updateItem<Shipment>('shipments', editingId, {
+          ...form,
+          updatedAt: now,
+        });
+        setShipments(updated);
+      } else {
+        const newShipment: Shipment = {
+          id: generateId(),
+          ...form,
+          documents: [],
+          createdAt: now,
+          updatedAt: now,
+        };
+        const updated = await addItem<Shipment>('shipments', newShipment);
+        setShipments(updated);
+      }
+      closeModal();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save shipment');
+    } finally {
+      setLoading(false);
     }
-    closeModal();
   }, [form, editingId, closeModal]);
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = removeItem<Shipment>(STORAGE_KEYS.SHIPMENTS, id);
-    setShipments(updated);
+  const handleDelete = useCallback(async (id: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await removeItem<Shipment>('shipments', id);
+      setShipments(updated);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete shipment');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const updateField = useCallback(
@@ -145,8 +190,11 @@ export default function ShipmentsPage() {
 
 
 
+  if (loading) return <Loading />;
+
   return (
     <div className="animate-fade-in">
+      {error && <ErrorBanner message={error} />}
       {/* Page Header */}
       <div className="page-header">
         <div className="page-header-top">
@@ -245,7 +293,7 @@ export default function ShipmentsPage() {
                     <button
                       id={`btn-delete-shipment-${shipment.id}`}
                       className="btn btn-danger btn-icon btn-sm"
-                      onClick={() => handleDelete(shipment.id)}
+                      onClick={() => { void handleDelete(shipment.id); }}
                       title="Delete"
                     >
                       <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
@@ -482,7 +530,7 @@ export default function ShipmentsPage() {
               <button
                 id="btn-save-shipment"
                 className="btn btn-primary"
-                onClick={handleSubmit}
+                onClick={() => { void handleSubmit(); }}
                 disabled={!form.reference.trim() || !form.estimatedArrival}
               >
                 {editingId ? 'Update Shipment' : 'Create Shipment'}

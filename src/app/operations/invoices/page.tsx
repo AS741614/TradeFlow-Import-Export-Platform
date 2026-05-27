@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { getItems, addItem, updateItem, removeItem, STORAGE_KEYS } from '@/lib/storage';
+import { useState, useCallback, useEffect } from 'react';
+import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
 import { generateId, formatCurrency, formatDate, getStatusColor, nowISO, toISODate } from '@/lib/utils';
 import { CURRENCIES } from '@/lib/constants';
 import type { Invoice, InvoiceStatus, Contact, LineItem } from '@/lib/types';
+import { StorageError } from '@/lib/api-client';
+import Loading from '@/components/Loading';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const EMPTY_LINE_ITEM = {
   description: '',
@@ -26,8 +29,10 @@ const EMPTY_FORM = {
 };
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => getItems<Invoice>(STORAGE_KEYS.INVOICES));
-  const [contacts] = useState<Contact[]>(() => getItems<Contact>(STORAGE_KEYS.CONTACTS));
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -35,6 +40,30 @@ export default function InvoicesPage() {
 
   // Line item adder in form
   const [tempItem, setTempItem] = useState(EMPTY_LINE_ITEM);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [invoicesData, contactsData] = await Promise.all([
+          getItems<Invoice>('invoices'),
+          getItems<Contact>('contacts'),
+        ]);
+        if (!cancelled) {
+          setInvoices(invoicesData);
+          setContacts(contactsData);
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load invoices or contacts');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = invoices.filter((inv) => {
     const q = search.toLowerCase();
@@ -119,7 +148,7 @@ export default function InvoicesPage() {
     updateField('lineItems', updatedItems);
   };
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (!form.number.trim() || !form.contactId || form.lineItems.length === 0) return;
 
     const contact = contacts.find((c) => c.id === form.contactId);
@@ -127,34 +156,42 @@ export default function InvoicesPage() {
 
     const { subtotal, tax, total } = calculateTotals(form.lineItems, form.taxRate);
 
-    if (editingId) {
-      const updated = updateItem<Invoice>(STORAGE_KEYS.INVOICES, editingId, {
-        ...form,
-        contactName,
-        subtotal,
-        tax,
-        total,
-      });
-      setInvoices(updated);
-    } else {
-      const newInvoice: Invoice = {
-        id: generateId(),
-        ...form,
-        contactName,
-        subtotal,
-        tax,
-        total,
-        createdAt: nowISO(),
-      };
-      const updated = addItem<Invoice>(STORAGE_KEYS.INVOICES, newInvoice);
-      setInvoices(updated);
+    try {
+      if (editingId) {
+        const updated = await updateItem<Invoice>('invoices', editingId, {
+          ...form,
+          contactName,
+          subtotal,
+          tax,
+          total,
+        });
+        setInvoices(updated);
+      } else {
+        const newInvoice: Invoice = {
+          id: generateId(),
+          ...form,
+          contactName,
+          subtotal,
+          tax,
+          total,
+          createdAt: nowISO(),
+        };
+        const updated = await addItem<Invoice>('invoices', newInvoice);
+        setInvoices(updated);
+      }
+      closeModal();
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to save invoice');
     }
-    closeModal();
   }, [form, editingId, contacts, closeModal]);
 
-  const handleDelete = useCallback((id: string) => {
-    const updated = removeItem<Invoice>(STORAGE_KEYS.INVOICES, id);
-    setInvoices(updated);
+  const handleDelete = useCallback(async (id: string) => {
+    try {
+      const updated = await removeItem<Invoice>('invoices', id);
+      setInvoices(updated);
+    } catch (err) {
+      setError(err instanceof StorageError ? err.message : 'Failed to delete invoice');
+    }
   }, []);
 
 
@@ -175,80 +212,86 @@ export default function InvoicesPage() {
         <p>Issue, track, and manage commercial billing invoices for global clients.</p>
       </div>
 
-      {/* Data Table */}
-      <div className="data-table-wrapper">
-        <div className="data-table-header">
-          <h3>{filtered.length} Invoice{filtered.length !== 1 ? 's' : ''}</h3>
-          <div className="data-table-actions">
-            <input
-              id="input-invoices-search"
-              className="form-input"
-              type="text"
-              placeholder="Search invoice or contact..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 260, height: 36 }}
-            />
-          </div>
-        </div>
+      {error && <ErrorBanner message={error} />}
 
-        {filtered.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Invoice Number</th>
-                <th>Contact / Company</th>
-                <th>Amount</th>
-                <th>Issued</th>
-                <th>Due Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((invoice) => (
-                <tr key={invoice.id} className="stagger-item">
-                  <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{invoice.number}</td>
-                  <td>{invoice.contactName}</td>
-                  <td>{formatCurrency(invoice.total, invoice.currency)}</td>
-                  <td>{formatDate(invoice.issuedDate)}</td>
-                  <td>{formatDate(invoice.dueDate)}</td>
-                  <td>
-                    <span className={`badge ${getStatusColor(invoice.status === 'paid' ? 'success' : invoice.status === 'sent' ? 'info' : invoice.status === 'overdue' ? 'danger' : 'neutral')}`}>
-                      {invoice.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                      <button
-                        id={`btn-edit-invoice-${invoice.id}`}
-                        className="btn btn-ghost btn-sm btn-icon"
-                        onClick={() => openEdit(invoice)}
-                        title="Edit"
-                      >
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      </button>
-                      <button
-                        id={`btn-delete-invoice-${invoice.id}`}
-                        className="btn btn-danger btn-sm btn-icon"
-                        onClick={() => handleDelete(invoice.id)}
-                        title="Delete"
-                      >
-                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="data-table-empty">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            <p>No invoices found. Create your first commercial invoice to get started.</p>
+      {loading ? (
+        <Loading />
+      ) : (
+        /* Data Table */
+        <div className="data-table-wrapper">
+          <div className="data-table-header">
+            <h3>{filtered.length} Invoice{filtered.length !== 1 ? 's' : ''}</h3>
+            <div className="data-table-actions">
+              <input
+                id="input-invoices-search"
+                className="form-input"
+                type="text"
+                placeholder="Search invoice or contact..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: 260, height: 36 }}
+              />
+            </div>
           </div>
-        )}
-      </div>
+
+          {filtered.length > 0 ? (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice Number</th>
+                  <th>Contact / Company</th>
+                  <th>Amount</th>
+                  <th>Issued</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((invoice) => (
+                  <tr key={invoice.id} className="stagger-item">
+                    <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{invoice.number}</td>
+                    <td>{invoice.contactName}</td>
+                    <td>{formatCurrency(invoice.total, invoice.currency)}</td>
+                    <td>{formatDate(invoice.issuedDate)}</td>
+                    <td>{formatDate(invoice.dueDate)}</td>
+                    <td>
+                      <span className={`badge ${getStatusColor(invoice.status === 'paid' ? 'success' : invoice.status === 'sent' ? 'info' : invoice.status === 'overdue' ? 'danger' : 'neutral')}`}>
+                        {invoice.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                        <button
+                          id={`btn-edit-invoice-${invoice.id}`}
+                          className="btn btn-ghost btn-sm btn-icon"
+                          onClick={() => openEdit(invoice)}
+                          title="Edit"
+                        >
+                          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                        </button>
+                        <button
+                          id={`btn-delete-invoice-${invoice.id}`}
+                          className="btn btn-danger btn-sm btn-icon"
+                          onClick={() => { void handleDelete(invoice.id); }}
+                          title="Delete"
+                        >
+                          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="data-table-empty">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <p>No invoices found. Create your first commercial invoice to get started.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Invoice Modal */}
       {showModal && (
@@ -469,7 +512,7 @@ export default function InvoicesPage() {
               <button
                 id="btn-save-invoice"
                 className="btn btn-primary"
-                onClick={handleSubmit}
+                onClick={() => { void handleSubmit(); }}
                 disabled={!form.number.trim() || !form.contactId || form.lineItems.length === 0}
               >
                 {editingId ? 'Update Invoice' : 'Create Invoice'}
