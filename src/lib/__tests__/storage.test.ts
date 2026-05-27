@@ -204,16 +204,59 @@ describe('storage.ts REST API Integration Tests', () => {
   });
 
   describe('getValue', () => {
-    it('should resolve to the default value', async () => {
-      const result = await getValue('bp_last_saved', '2026-05-26');
-      expect(result).toBe('2026-05-26');
+    it('should call GET /api/app-metadata/[key] and return parsed JSON value if found', async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: { key: 'bp_last_saved', value: JSON.stringify('2026-05-27T10:00:00Z') } }),
+      } as unknown as Response);
+
+      const result = await getValue('bp_last_saved', 'default-value');
+      expect(fetch).toHaveBeenCalledWith('/api/app-metadata/bp_last_saved', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      expect(result).toBe('2026-05-27T10:00:00Z');
+    });
+
+    it('should return defaultValue if GET returns null (not found)', async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: null }),
+      } as unknown as Response);
+
+      const result = await getValue('bp_last_saved', 'default-value');
+      expect(result).toBe('default-value');
+    });
+
+    it('should return defaultValue if fetch throws or parses invalid JSON', async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: { key: 'bp_last_saved', value: '{invalid json' } }),
+      } as unknown as Response);
+
+      const result = await getValue('bp_last_saved', 'default-value');
+      expect(result).toBe('default-value');
     });
   });
 
   describe('setValue', () => {
-    it('should resolve to void', async () => {
-      const result = await setValue('bp_last_saved', '2026-05-26');
-      expect(result).toBeUndefined();
+    it('should call PUT /api/app-metadata/[key] with stringified value', async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ data: { key: 'bp_last_saved', value: JSON.stringify('2026-05-27T10:00:00Z') } }),
+      } as unknown as Response);
+
+      await setValue('bp_last_saved', '2026-05-27T10:00:00Z');
+      expect(fetch).toHaveBeenCalledWith('/api/app-metadata/bp_last_saved', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify('2026-05-27T10:00:00Z') }),
+      });
     });
   });
+
 });

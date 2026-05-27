@@ -129,20 +129,29 @@ export async function removeItem<T extends { id: string }>(key: string, id: stri
 
 /**
  * Get a single value (non-array).
- * Stubbed for Prompt 9a. Real implementation deferred to Prompt 9b.
  */
-export function getValue<T>(key: string, defaultValue: T): Promise<T> {
-  void key;
-  return Promise.resolve(defaultValue);
+export async function getValue<T>(key: string, defaultValue: T): Promise<T> {
+  const endpoint = `/api/app-metadata/${key}`;
+  try {
+    const data = await apiFetch<{ key: string; value: string } | null>('GET', endpoint);
+    if (!data?.value) {
+      return defaultValue;
+    }
+    return JSON.parse(data.value) as T;
+  } catch (error) {
+    console.error(`Failed to get value for key ${key}:`, error);
+    return defaultValue;
+  }
 }
 
 /**
  * Set a single value (non-array).
- * Stubbed for Prompt 9a. Real implementation deferred to Prompt 9b.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-export function setValue<T>(key: string, value: T): Promise<void> {
-  void key;
-  void value;
-  return Promise.resolve();
+export async function setValue<T>(key: string, value: T): Promise<void> {
+  const endpoint = `/api/app-metadata/${key}`;
+  await apiFetch<{ key: string; value: string }>('PUT' as 'POST', endpoint, {
+    value: JSON.stringify(value),
+  });
 }
+

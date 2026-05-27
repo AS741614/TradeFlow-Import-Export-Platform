@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getItems, addItem, updateItem, removeItem } from '@/lib/storage';
+import { getItems, addItem, updateItem, removeItem, getValue, setValue } from '@/lib/storage';
 import { generateId, formatDate, nowISO } from '@/lib/utils';
 import { getDefaultBusinessPlan, getDefaultSwotItems } from '@/lib/constants';
 import type { BusinessPlanSection, SwotItem } from '@/lib/types';
@@ -49,12 +49,14 @@ export default function BusinessPlanPage() {
           loadedSwot = seededSwot;
         }
 
+        const savedTime = await getValue<string>('bp_last_saved', nowISO());
+
         if (!cancelled) {
           const sorted = loadedSections.sort((a, b) => a.order - b.order);
           setSections(sorted);
           setSwotItems(loadedSwot);
           setActiveTab(sorted[0]?.id ?? '');
-          setLastSaved(nowISO());
+          setLastSaved(savedTime);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load business plan');
@@ -68,12 +70,22 @@ export default function BusinessPlanPage() {
     };
   }, []);
 
+  async function markBusinessPlanSaved() {
+    try {
+      const timestamp = nowISO();
+      await setValue<string>('bp_last_saved', timestamp);
+      setLastSaved(timestamp);
+    } catch (err) {
+      console.error('Failed to update bp_last_saved:', err);
+    }
+  }
+
   const handleSectionTextChange = async (sectionId: string, newText: string) => {
     setError(null);
     try {
       const fresh = await updateItem<BusinessPlanSection>('business-plan', sectionId, { content: newText });
       setSections(fresh.sort((a, b) => a.order - b.order));
-      setLastSaved(nowISO());
+      await markBusinessPlanSaved();
     } catch (err) {
       setError(err instanceof StorageError ? err.message : 'Failed to save document section');
     }
@@ -91,7 +103,7 @@ export default function BusinessPlanPage() {
     try {
       const fresh = await addItem<SwotItem>('swot', newItem);
       setSwotItems(fresh);
-      setLastSaved(nowISO());
+      await markBusinessPlanSaved();
 
       // Clear input
       if (category === 'strength') setNewStrength('');
@@ -108,7 +120,7 @@ export default function BusinessPlanPage() {
     try {
       const fresh = await removeItem<SwotItem>('swot', id);
       setSwotItems(fresh);
-      setLastSaved(nowISO());
+      await markBusinessPlanSaved();
     } catch (err) {
       setError(err instanceof StorageError ? err.message : 'Failed to delete SWOT item');
     }

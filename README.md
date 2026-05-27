@@ -109,6 +109,7 @@ All reads and writes in the application now go through `src/lib/storage.ts` usin
 - **Error Handling**: Network and HTTP status code exceptions are standardly wrapped and thrown as `StorageError`.
 - **Environment Base URL**: Server-side contexts resolve base URLs using `NEXT_PUBLIC_BASE_URL` (absolute URL), while client components use relative endpoints.
 - **LocalStorage Deprecation**: Browser-level `localStorage` references have been completely removed from the runtime codebase.
+- **App Metadata Persistence**: Single-value app configurations (like `bp_last_saved` timestamp) are persisted in the `app_metadata` PostgreSQL table via `GET/PUT/DELETE /api/app-metadata/[key]`, with JSON serialization for type safety.
 
 ## Learn More
 
