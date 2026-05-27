@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getContacts, createContact } from '@/lib/db/queries/contacts';
 import { insertContactSchema } from '@/lib/db/validation/contacts';

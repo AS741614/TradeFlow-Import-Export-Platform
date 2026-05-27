@@ -5,4 +5,5 @@ export * from './finance';
 export * from './outreach';
 export * from './business';
 export * from './metadata';
+export * from './auth';
 

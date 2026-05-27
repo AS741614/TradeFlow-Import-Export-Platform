@@ -143,3 +143,15 @@ Every agent completion response must include:
   1. The row to be deleted is selected first.
   2. A snapshot of the row is inserted into the `deletion_logs` table (using the `deleteWithLog` helper).
   3. The target row is hard deleted from its table.
+
+---
+
+## Section 13: Authentication Mandates & Temporary Gaps (Phase 10a)
+- **Hashing Library**: Use `bcryptjs` (not native `bcrypt`) with a salt cost factor of 12 for password hashing. Enforce a minimum password length of 12 characters.
+- **Session Strategy**: Database revocable sessions (not JWT) using the NextAuth Drizzle adapter and Postgres `sessions` table.
+- **Session Cookie Security**: Configure session cookies with `httpOnly: true`, `sameSite: 'lax'`, and `secure` only in production.
+- **Self-signup Lockout**: `/signup` must automatically check the user count and redirect to `/login` if any user exists in the database.
+- **Temporary Security Gap & TODO Comments**:
+  - In Phase 10a, all API routes still use the static fallback variables `DEFAULT_USER_ID` and `DEFAULT_ORG_ID`.
+  - Every API route file must carry the comment: `// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session` at the top.
+  - Phase 10b MUST be completed before public VPS deployment. Public deployment with this security gap is strictly prohibited.

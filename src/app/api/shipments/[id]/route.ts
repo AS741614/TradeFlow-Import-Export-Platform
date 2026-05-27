@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getShipmentById, updateShipment, deleteShipment } from '@/lib/db/queries/shipments';
 import { updateShipmentSchema } from '@/lib/db/validation/shipments';

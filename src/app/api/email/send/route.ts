@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextResponse } from 'next/server';
 import { runCampaignSimulation } from '@/lib/email';
 

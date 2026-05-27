@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getBusinessPlanSectionById, updateBusinessPlanSection, deleteBusinessPlanSection } from '@/lib/db/queries/business-plan';
 import { updateBusinessPlanSchema } from '@/lib/db/validation/business-plan';

@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getCampaigns, createCampaign } from '@/lib/db/queries/campaigns';
 import { insertCampaignSchema } from '@/lib/db/validation/campaigns';

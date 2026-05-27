@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getFinancialProjections, createFinancialProjection } from '@/lib/db/queries/financial-projections';
 import { insertFinancialProjectionSchema } from '@/lib/db/validation/financial-projections';

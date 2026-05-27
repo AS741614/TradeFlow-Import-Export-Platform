@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getInvoiceById, updateInvoice, deleteInvoice } from '@/lib/db/queries/invoices';
 import { updateInvoiceSchema } from '@/lib/db/validation/invoices';

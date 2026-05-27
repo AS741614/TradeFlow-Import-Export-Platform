@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getTasks, createTask } from '@/lib/db/queries/tasks';
 import { insertTaskSchema } from '@/lib/db/validation/tasks';

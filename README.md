@@ -111,6 +111,15 @@ All reads and writes in the application now go through `src/lib/storage.ts` usin
 - **LocalStorage Deprecation**: Browser-level `localStorage` references have been completely removed from the runtime codebase.
 - **App Metadata Persistence**: Single-value app configurations (like `bp_last_saved` timestamp) are persisted in the `app_metadata` PostgreSQL table via `GET/PUT/DELETE /api/app-metadata/[key]`, with JSON serialization for type safety.
 
+## Authentication (Phase 10a)
+
+TradeFlow integrates Auth.js v5 (NextAuth.js) with database-backed sessions.
+
+- **Login Methods**: Credentials (email & password) and Google OAuth.
+- **Middleware Protection**: All UI routes are protected. Unauthenticated users are redirected to `/login`.
+- **First-time Registration Lock**: User registration via `/signup` is locked automatically after the first user (the Organization Owner) is created.
+- **Security Gap (Phase 10a Known Temporary State)**: While UI routes are protected by middleware, API routes still use static fallback variables (`DEFAULT_USER_ID`/`DEFAULT_ORG_ID`) and do not yet enforce active session authentication. API routes are reachable unauthenticated via direct fetch/curl request. This is a known, temporary development state during Phase 10a. Phase 10b will resolve this security gap. **Public VPS deployment is strictly prohibited until Phase 10b is implemented.**
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

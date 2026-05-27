@@ -1,3 +1,4 @@
+// TODO(10b): Replace DEFAULT_USER_ID/DEFAULT_ORG_ID with session
 import { NextRequest, NextResponse } from 'next/server';
 import { getOutreachContacts, createOutreachContact } from '@/lib/db/queries/outreach-contacts';
 import { insertOutreachContactSchema } from '@/lib/db/validation/outreach-contacts';
