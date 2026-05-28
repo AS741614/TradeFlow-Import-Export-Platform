@@ -28,11 +28,11 @@ export async function signUpUser(input: SignupInput) {
 
   // 1. Enforce signup rate limiting (3 attempts per hour)
   const headersList = await headers();
-  const rawIp = headersList.get('x-forwarded-for') || '127.0.0.1';
+  const rawIp = headersList.get('x-forwarded-for') ?? '127.0.0.1';
   const ip = (rawIp.split(',')[0] ?? '127.0.0.1').trim();
   const rateLimitResult = rateLimiter.check(ip, 'signup', { limit: 3, windowMs: 60 * 60 * 1000 });
   if (!rateLimitResult.allowed) {
-    throw new Error(`Too many registration attempts. Please try again after ${Math.ceil(rateLimitResult.retryAfterSeconds / 60)} minutes.`);
+    throw new Error(`Too many registration attempts. Please try again after ${String(Math.ceil(rateLimitResult.retryAfterSeconds / 60))} minutes.`);
   }
 
   const db = getDb();

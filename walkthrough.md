@@ -22,7 +22,7 @@ We have resolved all 3 Tier 1 critical findings from the audit and established a
 
 ### 4. Reference Bulk Import
 - **Pattern**: Implemented `POST /api/contacts/bulk-import` allowing users to import lists of contacts.
-- **Validations**: Enforces body checks, rejects loads exceeding 1000 records, and validates each row via Zod schema checks.
+- **Validations**: Enforces Zod body checks, rejects loads exceeding 1000 records, and validates each row via Zod schema checks.
 - **Transactional / Continuation Control**: Supports transactional all-or-nothing rollbacks (`continueOnError: false`) and row-by-row error-reporting continuation loop inserts (`continueOnError: true`).
 
 ---

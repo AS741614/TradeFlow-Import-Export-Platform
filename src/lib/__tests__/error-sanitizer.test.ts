@@ -3,7 +3,7 @@ import { sanitizeDbError, handleRouteError } from '../db/error-sanitizer';
 
 // Silence console.error logs in test output
 beforeAll(() => {
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'error').mockImplementation(() => { /* noop */ });
 });
 
 afterAll(() => {
@@ -19,7 +19,7 @@ describe('Error Sanitizer Tests', () => {
 
     const res = handleRouteError(error);
     expect(res.status).toBe(401);
-    const body = await res.json();
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 

@@ -21,7 +21,12 @@ export default tseslint.config(
       "public/**",
       "next-env.d.ts",
       "eslint.config.mjs",
-      "coverage/**"
+      "coverage/**",
+      "scripts/**",
+      "drizzle/**",
+      "*.ts",
+      "*.js",
+      "*.mjs"
     ]
   },
   js.configs.recommended,

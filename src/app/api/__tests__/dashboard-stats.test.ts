@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';

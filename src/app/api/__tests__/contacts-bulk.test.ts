@@ -1,5 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion, @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 import { getDb, closeDb } from '@/lib/db/client';
 import * as dbSchema from '@/lib/db/schema';
 import { POST as bulkImportPOST } from '../contacts/bulk-import/route';
@@ -8,7 +9,6 @@ import {
   mockAuthSession,
   createAuthenticatedRequest,
   mockAuthCall,
-  TEST_ORG_ID,
 } from './_helpers/auth-fixture';
 import { count } from 'drizzle-orm';
 
@@ -43,7 +43,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
 
   it('should reject unauthenticated requests with 401', async () => {
     mockAuthSession(null);
-    const res = await bulkImportPOST({} as any);
+    const res = await bulkImportPOST({} as unknown as NextRequest);
     expect(res.status).toBe(401);
   });
 
@@ -58,7 +58,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
       new Request('http://localhost/api/contacts/bulk-import', {
         method: 'POST',
         body: JSON.stringify({ rows: largeRows }),
-      }) as any
+      }) as unknown as NextRequest
     );
     expect(res.status).toBe(413);
   });
@@ -73,7 +73,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
       new Request('http://localhost/api/contacts/bulk-import', {
         method: 'POST',
         body: JSON.stringify({ wrongKey: [] }),
-      }) as any
+      }) as unknown as NextRequest
     );
     expect(res.status).toBe(400);
   });
@@ -94,7 +94,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
       body: JSON.stringify({ rows: validRows, continueOnError: true }),
     });
 
-    const res = await bulkImportPOST(req as any);
+    const res = await bulkImportPOST(req as unknown as NextRequest);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -102,8 +102,8 @@ describe('Contacts Bulk Import API Integration Tests', () => {
     expect(body.data.failed.length).toBe(0);
 
     // Verify DB count
-    const [dbCount] = await db.select({ value: count() }).from(dbSchema.contacts);
-    expect(dbCount.value).toBe(3);
+    const dbCountResult = await db.select({ value: count() }).from(dbSchema.contacts);
+    expect(dbCountResult[0]?.value).toBe(3);
   });
 
   it('should support continuation reporting mixed successes and errors', async () => {
@@ -122,7 +122,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
       body: JSON.stringify({ rows: mixedRows, continueOnError: true }),
     });
 
-    const res = await bulkImportPOST(req as any);
+    const res = await bulkImportPOST(req as unknown as NextRequest);
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -132,8 +132,8 @@ describe('Contacts Bulk Import API Integration Tests', () => {
     expect(body.data.failed[0].errors).toContain('company: Company name is required');
 
     // Verify DB count (only valid rows inserted)
-    const [dbCount] = await db.select({ value: count() }).from(dbSchema.contacts);
-    expect(dbCount.value).toBe(2);
+    const dbCountResult = await db.select({ value: count() }).from(dbSchema.contacts);
+    expect(dbCountResult[0]?.value).toBe(2);
   });
 
   it('should support transactional rollback on error when continueOnError is false', async () => {
@@ -152,12 +152,12 @@ describe('Contacts Bulk Import API Integration Tests', () => {
       body: JSON.stringify({ rows: mixedRows, continueOnError: false }),
     });
 
-    const res = await bulkImportPOST(req as any);
+    const res = await bulkImportPOST(req as unknown as NextRequest);
     // Since it's transactional rollback, it will throw a validation error inside the query helper, returning 400 Bad Request via the handleRouteError sanitizer!
     expect(res.status).toBe(400);
 
     // Verify DB count remains 0 due to transaction rollback
-    const [dbCount] = await db.select({ value: count() }).from(dbSchema.contacts);
-    expect(dbCount.value).toBe(0);
+    const dbCountResult = await db.select({ value: count() }).from(dbSchema.contacts);
+    expect(dbCountResult[0]?.value).toBe(0);
   });
 });

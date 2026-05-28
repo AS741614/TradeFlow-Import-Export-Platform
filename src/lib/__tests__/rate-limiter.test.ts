@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { RateLimiter } from '../rate-limiter';
-import { NextRequest } from 'next/server';
 
 describe('Rate Limiter Tests', () => {
   let limiter: RateLimiter;
@@ -10,13 +9,13 @@ describe('Rate Limiter Tests', () => {
   beforeEach(() => {
     limiter = new RateLimiter();
     // Revert to non-test behavior to test actual rate limiting mechanisms
-    (process.env as any).NODE_ENV = 'production';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
     delete process.env.DISABLE_RATE_LIMIT;
   });
 
   afterEach(() => {
     limiter.destroy();
-    (process.env as any).NODE_ENV = originalNodeEnv;
+    (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv;
     process.env.DISABLE_RATE_LIMIT = originalDisableRateLimit;
   });
 
@@ -54,14 +53,16 @@ describe('Rate Limiter Tests', () => {
 
     // Sleep for 150ms using synchronous blocking or mock timers
     const start = Date.now();
-    while (Date.now() - start < 150) {}
+    while (Date.now() - start < 150) {
+      // noop
+    }
 
     expect(limiter.check(ip, action, options).allowed).toBe(true);
   });
 
   // Adjustment 1: Test explicit bypass checks
   it('should short-circuit and allow requests always in test environments', () => {
-    (process.env as any).NODE_ENV = 'test';
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
     const ip = '192.168.1.4';
     const action = 'login';
     const options = { limit: 1, windowMs: 10000 };

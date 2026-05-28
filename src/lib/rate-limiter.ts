@@ -12,10 +12,11 @@ export class RateLimiter {
   constructor() {
     // Start background cleanup to prevent memory leaks (only if in a context where setInterval is defined)
     if (typeof setInterval !== 'undefined') {
-      this.cleanupInterval = setInterval(() => this.cleanup(), 60000);
+      const interval = setInterval(() => this.cleanup(), 60000);
+      this.cleanupInterval = interval;
       // Unref the interval if available so Node doesn't hang in tests
-      if (this.cleanupInterval && typeof this.cleanupInterval.unref === 'function') {
-        this.cleanupInterval.unref();
+      if (typeof interval.unref === 'function') {
+        interval.unref();
       }
     }
   }
@@ -79,17 +80,19 @@ export const rateLimiter = new RateLimiter();
  * Route handler decorator wrapper for rate limiting.
  */
 export function withRateLimit(
-  handler: (req: NextRequest, ...args: any[]) => Promise<Response> | Response,
+  handler: (req: NextRequest, ...args: unknown[]) => Promise<Response> | Response,
   options: { keyPrefix: string; limit: number; windowMs: number; onlyMethods?: string[] }
 ) {
-  return async function (req: NextRequest, ...args: any[]) {
+  return async function (req: NextRequest, ...args: unknown[]) {
     const method = req.method;
     if (options.onlyMethods && !options.onlyMethods.includes(method)) {
       return handler(req, ...args);
     }
 
-    const ip = req.headers.get('x-forwarded-for') || (req as any).ip || '127.0.0.1';
-    const clientIp = ip.split(',')[0].trim();
+    const forwarded = req.headers.get('x-forwarded-for');
+    const reqIp = (req as unknown as Record<string, unknown>).ip;
+    const ip = forwarded ?? (typeof reqIp === 'string' ? reqIp : undefined) ?? '127.0.0.1';
+    const clientIp = (ip.split(',')[0] ?? '127.0.0.1').trim();
 
     const limitResult = rateLimiter.check(clientIp, options.keyPrefix, {
       limit: options.limit,

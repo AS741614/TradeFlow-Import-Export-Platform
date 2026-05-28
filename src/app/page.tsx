@@ -44,7 +44,20 @@ export default function DashboardPage() {
         if (!statsRes.ok) {
           throw new Error('Failed to load dashboard statistics');
         }
-        const statsData = await statsRes.json();
+        interface DashboardStats {
+          contactsCount: number;
+          productsCount: number;
+          shipmentsCount: number;
+          invoicesCount: number;
+          tasksCount: number;
+          campaignsCount: number;
+          activeProductsCount: number;
+          openInvoicesCount: number;
+          pendingTasksCount: number;
+          inTransitShipmentsCount: number;
+          totalCampaignsSent: number;
+        }
+        const statsData = (await statsRes.json()) as { data: DashboardStats };
         const stats = statsData.data;
 
         // 2. Fetch tasks array only for the "Priority Tasks" section if tasks exist

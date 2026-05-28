@@ -15,7 +15,7 @@ export interface BulkImportResult {
 export async function bulkImportContacts(
   orgId: string,
   rows: unknown[],
-  continueOnError: boolean = true
+  continueOnError = true
 ): Promise<BulkImportResult> {
   const db = getDb();
   let imported = 0;
@@ -29,7 +29,7 @@ export async function bulkImportContacts(
         const parsed = insertContactSchema.safeParse(rawRow);
         if (!parsed.success) {
           const errors = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
-          throw new Error(`Row ${i + 1} validation failed: ${errors.join(', ')}`);
+          throw new Error(`Row ${String(i + 1)} validation failed: ${errors.join(', ')}`);
         }
 
         try {
@@ -39,7 +39,7 @@ export async function bulkImportContacts(
           });
           imported++;
         } catch (err: unknown) {
-          throw new Error(`Row ${i + 1} insertion failed: ${err instanceof Error ? err.message : 'Unknown database error'}`);
+          throw new Error(`Row ${String(i + 1)} insertion failed: ${err instanceof Error ? err.message : 'Unknown database error'}`);
         }
       }
       return { imported, failed: [] };

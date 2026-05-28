@@ -52,7 +52,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
   let openInvoicesCount = results[7][0]?.value ?? 0;
   let pendingTasksCount = results[8][0]?.value ?? 0;
   let inTransitShipmentsCount = results[9][0]?.value ?? 0;
-  let totalCampaignsSent = Number(results[10][0]?.value ?? 0);
+  let totalCampaignsSent = results[10][0]?.value ?? 0;
 
   // Adjustment 3: Server-side seeding when the organization is brand new
   if (contactsCount === 0 && productsCount === 0 && tasksCount === 0) {
@@ -124,7 +124,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
     openInvoicesCount = afterSeedingResults[7][0]?.value ?? 0;
     pendingTasksCount = afterSeedingResults[8][0]?.value ?? 0;
     inTransitShipmentsCount = afterSeedingResults[9][0]?.value ?? 0;
-    totalCampaignsSent = Number(afterSeedingResults[10][0]?.value ?? 0);
+    totalCampaignsSent = afterSeedingResults[10][0]?.value ?? 0;
   }
 
   return {
