@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getEmailTemplates, createEmailTemplate } from '@/lib/db/queries/email-templates';
 import { insertEmailTemplateSchema } from '@/lib/db/validation/email-templates';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
@@ -9,11 +10,7 @@ export async function GET() {
     const list = await getEmailTemplates(session.orgId);
     return NextResponse.json({ data: list });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
 
@@ -28,10 +25,6 @@ export async function POST(req: NextRequest) {
     const record = await createEmailTemplate(session.orgId, parsed.data);
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }

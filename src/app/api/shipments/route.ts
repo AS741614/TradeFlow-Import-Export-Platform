@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getShipments, createShipment } from '@/lib/db/queries/shipments';
 import { insertShipmentSchema } from '@/lib/db/validation/shipments';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
@@ -9,11 +10,7 @@ export async function GET() {
     const list = await getShipments(session.orgId);
     return NextResponse.json({ data: list });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
 
@@ -28,10 +25,6 @@ export async function POST(req: NextRequest) {
     const record = await createShipment(session.orgId, parsed.data);
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { runCampaignSimulation } from '@/lib/email';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
 
@@ -24,12 +25,7 @@ export async function POST(request: Request) {
       message: 'Campaign dispatched successfully',
       campaignId,
     });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    console.error('Email API Route Error:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error) {
+    return handleRouteError(error);
   }
 }

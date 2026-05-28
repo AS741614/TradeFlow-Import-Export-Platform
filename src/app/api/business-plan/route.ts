@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getBusinessPlanSections, createBusinessPlanSection } from '@/lib/db/queries/business-plan';
 import { insertBusinessPlanSchema } from '@/lib/db/validation/business-plan';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
@@ -9,11 +10,7 @@ export async function GET() {
     const list = await getBusinessPlanSections(session.orgId);
     return NextResponse.json({ data: list });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
 
@@ -28,10 +25,6 @@ export async function POST(req: NextRequest) {
     const record = await createBusinessPlanSection(session.orgId, parsed.data);
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }

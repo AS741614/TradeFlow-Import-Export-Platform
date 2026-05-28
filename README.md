@@ -87,6 +87,8 @@ User accounts and organization tenants are created dynamically on the first visi
   - `201 Created`: Successful creation.
   - `400 Bad Request`: Validation failure.
   - `404 Not Found`: Record not found.
+  - `413 Payload Too Large`: Payload exceeds record limit (e.g. bulk-import > 1000 rows).
+  - `429 Too Many Requests`: Rate limit exceeded.
   - `500 Server Error`: Database or execution error.
 - **Operations Routes (Phase 8a)**:
   - `/api/contacts` / `/api/contacts/[id]`
@@ -94,6 +96,8 @@ User accounts and organization tenants are created dynamically on the first visi
   - `/api/compliance` / `/api/compliance/[id]`
   - `/api/shipments` / `/api/shipments/[id]` (handles nested products and documents relations)
   - `/api/invoices` / `/api/invoices/[id]` (handles nested line items relation)
+  - `/api/dashboard/stats`: Returns database-aggregated count metrics and seeds default sample data on fresh accounts.
+  - `/api/contacts/bulk-import`: References bulk import endpoint supporting up to 1000 rows per load.
 
 ## Storage Layer (Phase 9a)
 
@@ -107,14 +111,18 @@ All reads and writes in the application now go through `src/lib/storage.ts` usin
 - **LocalStorage Deprecation**: Browser-level `localStorage` references have been completely removed from the runtime codebase.
 - **App Metadata Persistence**: Single-value app configurations (like `bp_last_saved` timestamp) are persisted in the `app_metadata` PostgreSQL table via `GET/PUT/DELETE /api/app-metadata/[key]`, with JSON serialization for type safety.
 
-## Authentication (Phase 10b)
+## Authentication & Rate Limiting (Phase 10b / Phase 11)
 
 TradeFlow integrates Auth.js v5 (NextAuth.js) with database-backed sessions.
 
 - **Login Methods**: Credentials (email & password) and Google OAuth.
 - **Middleware Protection**: All UI routes are protected. Unauthenticated users are redirected to `/login`.
 - **First-time Registration Lock**: User registration via `/signup` is locked automatically after the first user (the Organization Owner) is created.
-- **API Security (Phase 10b)**: Every API route is secured using session-derived authentication (`throwIfNotAuthenticated()`). Unauthenticated requests to API routes are rejected with a `401 Unauthorized` response. Default user and organization constants have been removed.
+- **API Security**: Every API route is secured using session-derived authentication (`throwIfNotAuthenticated()`). Unauthenticated requests to API routes are rejected with a `401 Unauthorized` response.
+- **Rate Limiting**: Public endpoints enforce in-memory token bucket limits to prevent brute-force attacks:
+  - **Signup Action**: 3 registration attempts per hour.
+  - **Sign-in Endpoint**: 5 credential validation attempts per 15 minutes per client IP.
+  - Returns `429 Too Many Requests` with a standard `Retry-After` header indicating delay in seconds. (Redis-backed token bucket is scheduled to replace the in-memory store in Prompt 23).
 
 ## Learn More
 

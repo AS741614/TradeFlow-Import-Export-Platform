@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getItems, addItem } from '@/lib/storage';
+import { getItems } from '@/lib/storage';
 import { formatCurrency, formatNumber } from '@/lib/utils';
-import { getSampleProducts, getSampleContacts, getDefaultTasks } from '@/lib/constants';
-import type { Product, Contact, Task, Shipment, Invoice, Campaign } from '@/lib/types';
+import type { Task } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -40,76 +39,36 @@ export default function DashboardPage() {
     let cancelled = false;
     async function load() {
       try {
-        let products = await getItems<Product>('products');
-        if (products.length === 0) {
-          try {
-            const samples = getSampleProducts();
-            const seeded: Product[] = [];
-            for (const item of samples) {
-              const added = await addItem<Product>('products', item);
-              seeded.splice(0, seeded.length, ...added);
-            }
-            products = seeded;
-          } catch (err) {
-            console.warn('Failed to seed sample products (likely due to missing organization):', err);
-          }
+        // 1. Fetch aggregated stats from server (this auto-seeds if fresh)
+        const statsRes = await fetch('/api/dashboard/stats');
+        if (!statsRes.ok) {
+          throw new Error('Failed to load dashboard statistics');
         }
+        const statsData = await statsRes.json();
+        const stats = statsData.data;
 
-        let contacts = await getItems<Contact>('contacts');
-        if (contacts.length === 0) {
-          try {
-            const samples = getSampleContacts();
-            const seeded: Contact[] = [];
-            for (const item of samples) {
-              const added = await addItem<Contact>('contacts', item);
-              seeded.splice(0, seeded.length, ...added);
-            }
-            contacts = seeded;
-          } catch (err) {
-            console.warn('Failed to seed sample contacts (likely due to missing organization):', err);
-          }
+        // 2. Fetch tasks array only for the "Priority Tasks" section if tasks exist
+        let dashboardTasks: Task[] = [];
+        if (stats.tasksCount > 0) {
+          dashboardTasks = await getItems<Task>('tasks');
         }
-
-        let tasks = await getItems<Task>('tasks');
-        if (tasks.length === 0) {
-          try {
-            const defaults = getDefaultTasks();
-            const seeded: Task[] = [];
-            for (const item of defaults) {
-              const added = await addItem<Task>('tasks', item);
-              seeded.splice(0, seeded.length, ...added);
-            }
-            tasks = seeded;
-          } catch (err) {
-            console.warn('Failed to seed default tasks (likely due to missing organization):', err);
-          }
-        }
-
-        const [shipments, invoices, campaigns] = await Promise.all([
-          getItems<Shipment>('shipments'),
-          getItems<Invoice>('invoices'),
-          getItems<Campaign>('campaigns'),
-        ]);
 
         if (!cancelled) {
-          const lowStock = products.filter(p => p.status === 'low-stock' || p.status === 'out-of-stock').length;
-          const activeShipments = shipments.filter(s => s.status !== 'delivered').length;
-          const pendingInvoices = invoices.filter(i => i.status === 'draft' || i.status === 'sent').length;
-          const completedTasks = tasks.filter(t => t.status === 'done').length;
-          const totalEmailsSent = campaigns.reduce((sum, c) => sum + c.stats.sent, 0);
+          const completedTasks = stats.tasksCount - stats.pendingTasksCount;
+          const lowStock = stats.productsCount - stats.activeProductsCount;
 
           setMetrics([
-            { label: 'Total Products', value: formatNumber(products.length), color: 'blue', icon: <MetricIcon name="products" /> },
-            { label: 'Active Shipments', value: formatNumber(activeShipments), color: 'cyan', icon: <MetricIcon name="shipments" /> },
-            { label: 'Pending Invoices', value: formatNumber(pendingInvoices), color: 'amber', icon: <MetricIcon name="invoices" /> },
-            { label: 'Total Contacts', value: formatNumber(contacts.length), color: 'purple', icon: <MetricIcon name="contacts" /> },
-            { label: 'Tasks Completed', value: `${String(completedTasks)}/${String(tasks.length)}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
+            { label: 'Total Products', value: formatNumber(stats.productsCount), color: 'blue', icon: <MetricIcon name="products" /> },
+            { label: 'Active Shipments', value: formatNumber(stats.inTransitShipmentsCount), color: 'cyan', icon: <MetricIcon name="shipments" /> },
+            { label: 'Pending Invoices', value: formatNumber(stats.openInvoicesCount), color: 'amber', icon: <MetricIcon name="invoices" /> },
+            { label: 'Total Contacts', value: formatNumber(stats.contactsCount), color: 'purple', icon: <MetricIcon name="contacts" /> },
+            { label: 'Tasks Completed', value: `${String(completedTasks)}/${String(stats.tasksCount)}`, color: 'emerald', icon: <MetricIcon name="tasks" /> },
             { label: 'Low Stock Alerts', value: formatNumber(lowStock), color: 'red', icon: <MetricIcon name="alert" /> },
-            { label: 'Emails Sent', value: formatNumber(totalEmailsSent), color: 'blue', icon: <MetricIcon name="email" /> },
+            { label: 'Emails Sent', value: formatNumber(stats.totalCampaignsSent), color: 'blue', icon: <MetricIcon name="email" /> },
             { label: 'Revenue (Est.)', value: formatCurrency(0), color: 'emerald', icon: <MetricIcon name="revenue" /> },
           ]);
 
-          setUrgentTasks(tasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5));
+          setUrgentTasks(dashboardTasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5));
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load dashboard metrics');
@@ -122,8 +81,6 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, []);
-
-
 
   if (loading) return <Loading />;
 

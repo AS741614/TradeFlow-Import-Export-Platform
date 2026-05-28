@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getAppMetadataValue, setAppMetadataValue, deleteAppMetadataValue } from '@/lib/db/queries/app-metadata';
 import { saveAppMetadataSchema } from '@/lib/db/validation/app-metadata';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
@@ -16,11 +17,7 @@ export async function GET(
     }
     return NextResponse.json({ data: { key: record.key, value: record.value } });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
 
@@ -42,11 +39,7 @@ export async function PUT(
     }
     return NextResponse.json({ data: { key: record.key, value: record.value } });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
 
@@ -60,10 +53,6 @@ export async function DELETE(
     await deleteAppMetadataValue(session.orgId, key);
     return NextResponse.json({ data: { deleted: true } });
   } catch (error) {
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const message = error instanceof Error ? error.message : 'Unknown database error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteError(error);
   }
 }
