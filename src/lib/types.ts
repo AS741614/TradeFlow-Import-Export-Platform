@@ -135,7 +135,7 @@ export interface BusinessPlanSection {
   id: string;
   title: string;
   content: string;
-  order: number;
+  sortOrder: number;
 }
 
 // ---- Project Dashboard ----

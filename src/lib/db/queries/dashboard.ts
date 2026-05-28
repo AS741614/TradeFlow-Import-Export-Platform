@@ -1,8 +1,15 @@
 import { getDb } from '../client';
-import { contacts, products, shipments, invoices, tasks, campaigns } from '../schema';
+import { contacts, products, shipments, invoices, tasks, campaigns, swotItems, businessPlanSections, orgs } from '../schema';
 import { count, eq, ne, sql } from 'drizzle-orm';
 import { withTenant } from './base';
-import { getSampleProducts, getSampleContacts, getDefaultTasks } from '../../constants';
+import { getSampleProducts, getSampleContacts, getDefaultTasks, getDefaultSwotItems, getDefaultBusinessPlan } from '@/lib/constants';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
+import * as schema from '../schema';
+
+type DBClient = ReturnType<typeof getDb>;
+type TxClient = PgTransaction<NodePgQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>;
 
 export interface DashboardStats {
   contactsCount: number;
@@ -22,7 +29,7 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
   const db = getDb();
 
   // Helper to execute all count queries
-  const runCounts = async (txClient = db) => {
+  const runCounts = async (txClient: DBClient | TxClient = db) => {
     return Promise.all([
       txClient.select({ value: count() }).from(contacts).where(withTenant(contacts, orgId)),
       txClient.select({ value: count() }).from(products).where(withTenant(products, orgId)),
@@ -37,6 +44,8 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
       txClient.select({
         value: sql<number>`COALESCE(SUM((stats->>'sent')::integer), 0)`,
       }).from(campaigns).where(withTenant(campaigns, orgId)),
+      txClient.select({ value: count() }).from(swotItems).where(withTenant(swotItems, orgId)),
+      txClient.select({ value: count() }).from(businessPlanSections).where(withTenant(businessPlanSections, orgId)),
     ]);
   };
 
@@ -53,62 +62,113 @@ export async function getDashboardStats(orgId: string, userId: string): Promise<
   let pendingTasksCount = results[8][0]?.value ?? 0;
   let inTransitShipmentsCount = results[9][0]?.value ?? 0;
   let totalCampaignsSent = results[10][0]?.value ?? 0;
+  const swotCount = results[11][0]?.value ?? 0;
+  const sectionCount = results[12][0]?.value ?? 0;
 
-  // Adjustment 3: Server-side seeding when the organization is brand new
-  if (contactsCount === 0 && productsCount === 0 && tasksCount === 0) {
+  // Seeding when the organization is brand new
+  if (
+    contactsCount === 0 &&
+    productsCount === 0 &&
+    tasksCount === 0 &&
+    swotCount === 0 &&
+    sectionCount === 0 &&
+    process.env.DISABLE_AUTO_SEEDING !== 'true'
+  ) {
     await db.transaction(async (tx) => {
-      // Seed default products
-      const defaultProducts = getSampleProducts().map(p => ({
-        name: p.name,
-        sku: p.sku,
-        hsCode: p.hsCode,
-        category: p.category,
-        quantity: p.quantity,
-        reorderLevel: p.reorderLevel,
-        unitCost: p.unitCost,
-        currency: p.currency,
-        supplier: p.supplier,
-        origin: p.origin,
-        status: p.status,
-        orgId,
-        createdByUserId: userId,
-      }));
-      if (defaultProducts.length > 0) {
-        await tx.insert(products).values(defaultProducts);
-      }
+      // 1. Lock the organization row
+      await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for('update');
 
-      // Seed default contacts
-      const defaultContacts = getSampleContacts().map(c => ({
-        company: c.company,
-        contactPerson: c.contactPerson,
-        email: c.email,
-        phone: c.phone,
-        country: c.country,
-        type: c.type,
-        status: c.status,
-        tradeTerms: c.tradeTerms,
-        orgId,
-        createdByUserId: userId,
-      }));
-      if (defaultContacts.length > 0) {
-        await tx.insert(contacts).values(defaultContacts);
-      }
+      // 2. Re-verify counts inside the transaction
+      const txResults = await runCounts(tx);
+      const txContactsCount = txResults[0][0]?.value ?? 0;
+      const txProductsCount = txResults[1][0]?.value ?? 0;
+      const txTasksCount = txResults[4][0]?.value ?? 0;
+      const txSwotCount = txResults[11][0]?.value ?? 0;
+      const txSectionCount = txResults[12][0]?.value ?? 0;
 
-      // Seed default tasks
-      const defaultTasks = getDefaultTasks().map(t => ({
-        title: t.title,
-        description: t.description,
-        status: t.status,
-        priority: t.priority,
-        dueDate: t.dueDate,
-        assignee: t.assignee,
-        tags: t.tags,
-        category: t.category,
-        orgId,
-        createdByUserId: userId,
-      }));
-      if (defaultTasks.length > 0) {
-        await tx.insert(tasks).values(defaultTasks);
+      if (
+        txContactsCount === 0 &&
+        txProductsCount === 0 &&
+        txTasksCount === 0 &&
+        txSwotCount === 0 &&
+        txSectionCount === 0
+      ) {
+        // Seed default products
+        const defaultProducts = getSampleProducts().map(p => ({
+          name: p.name,
+          sku: p.sku,
+          hsCode: p.hsCode,
+          category: p.category,
+          quantity: p.quantity,
+          reorderLevel: p.reorderLevel,
+          unitCost: p.unitCost,
+          currency: p.currency,
+          supplier: p.supplier,
+          origin: p.origin,
+          status: p.status,
+          orgId,
+          createdByUserId: userId,
+        }));
+        if (defaultProducts.length > 0) {
+          await tx.insert(products).values(defaultProducts);
+        }
+
+        // Seed default contacts
+        const defaultContacts = getSampleContacts().map(c => ({
+          company: c.company,
+          contactPerson: c.contactPerson,
+          email: c.email,
+          phone: c.phone,
+          country: c.country,
+          type: c.type,
+          status: c.status,
+          tradeTerms: c.tradeTerms,
+          orgId,
+          createdByUserId: userId,
+        }));
+        if (defaultContacts.length > 0) {
+          await tx.insert(contacts).values(defaultContacts);
+        }
+
+        // Seed default tasks
+        const defaultTasks = getDefaultTasks().map(t => ({
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          priority: t.priority,
+          dueDate: t.dueDate,
+          assignee: t.assignee,
+          tags: t.tags,
+          category: t.category,
+          orgId,
+          createdByUserId: userId,
+        }));
+        if (defaultTasks.length > 0) {
+          await tx.insert(tasks).values(defaultTasks);
+        }
+
+        // Seed default SWOT items
+        const defaultSwot = getDefaultSwotItems().map(s => ({
+          text: s.text,
+          category: s.category,
+          orgId,
+          createdByUserId: userId,
+        }));
+        if (defaultSwot.length > 0) {
+          await tx.insert(swotItems).values(defaultSwot);
+        }
+
+        // Seed default business plan sections
+        const defaultSections = getDefaultBusinessPlan().map(s => ({
+          title: s.title,
+          content: s.content,
+          sortOrder: s.sortOrder,
+          orgId,
+          createdByUserId: userId,
+        }));
+        if (defaultSections.length > 0) {
+          await tx.insert(businessPlanSections).values(defaultSections);
+        }
       }
     });
 

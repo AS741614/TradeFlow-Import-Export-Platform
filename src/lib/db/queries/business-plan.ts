@@ -1,6 +1,6 @@
 import { getDb } from '../client';
 import { businessPlanSections } from '../schema';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, count } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertBusinessPlanInput, UpdateBusinessPlanInput } from '../validation/business-plan';
 
@@ -29,8 +29,17 @@ export async function getBusinessPlanSectionById(orgId: string, id: string) {
 
 export async function createBusinessPlanSection(orgId: string, data: InsertBusinessPlanInput) {
   const db = getDb();
+  let sortOrder = data.sortOrder;
+  if (sortOrder === undefined) {
+    const counts = await db
+      .select({ val: count() })
+      .from(businessPlanSections)
+      .where(withTenant(businessPlanSections, orgId));
+    sortOrder = (counts[0]?.val ?? 0) + 1;
+  }
   const rows = await db.insert(businessPlanSections).values({
     ...data,
+    sortOrder,
     orgId,
   }).returning();
   const inserted = rows[0];

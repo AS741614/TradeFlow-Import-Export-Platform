@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getItems, addItem, updateItem, removeItem, getValue, setValue } from '@/lib/storage';
-import { generateId, formatDate, nowISO } from '@/lib/utils';
-import { getDefaultBusinessPlan, getDefaultSwotItems } from '@/lib/constants';
+import { generateId, formatDate, nowISO, calcPercentage } from '@/lib/utils';
 import type { BusinessPlanSection, SwotItem } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
@@ -27,32 +26,12 @@ export default function BusinessPlanPage() {
     let cancelled = false;
     async function load() {
       try {
-        let loadedSections = await getItems<BusinessPlanSection>('business-plan');
-        if (loadedSections.length === 0) {
-          const defaults = getDefaultBusinessPlan();
-          const seeded: BusinessPlanSection[] = [];
-          for (const item of defaults) {
-            const added = await addItem<BusinessPlanSection>('business-plan', item);
-            seeded.splice(0, seeded.length, ...added);
-          }
-          loadedSections = seeded;
-        }
-
-        let loadedSwot = await getItems<SwotItem>('swot');
-        if (loadedSwot.length === 0) {
-          const defaults = getDefaultSwotItems();
-          const seededSwot: SwotItem[] = [];
-          for (const item of defaults) {
-            const added = await addItem<SwotItem>('swot', item);
-            seededSwot.splice(0, seededSwot.length, ...added);
-          }
-          loadedSwot = seededSwot;
-        }
-
+        const loadedSections = await getItems<BusinessPlanSection>('business-plan');
+        const loadedSwot = await getItems<SwotItem>('swot');
         const savedTime = await getValue<string>('bp_last_saved', nowISO());
 
         if (!cancelled) {
-          const sorted = loadedSections.sort((a, b) => a.order - b.order);
+          const sorted = loadedSections.sort((a, b) => a.sortOrder - b.sortOrder);
           setSections(sorted);
           setSwotItems(loadedSwot);
           setActiveTab(sorted[0]?.id ?? '');
@@ -84,7 +63,7 @@ export default function BusinessPlanPage() {
     setError(null);
     try {
       const fresh = await updateItem<BusinessPlanSection>('business-plan', sectionId, { content: newText });
-      setSections(fresh.sort((a, b) => a.order - b.order));
+      setSections(fresh.sort((a, b) => a.sortOrder - b.sortOrder));
       await markBusinessPlanSaved();
     } catch (err) {
       setError(err instanceof StorageError ? err.message : 'Failed to save document section');
@@ -134,7 +113,7 @@ export default function BusinessPlanPage() {
   const totalSections = sections.length;
   const sectionsCompleted = sections.filter((s) => s.content.trim().length > 20).length;
   const swotCount = swotItems.length;
-  const completionPercentage = Math.round(((sectionsCompleted) / totalSections) * 100);
+  const completionPercentage = calcPercentage(sectionsCompleted, totalSections);
 
   if (loading) return <Loading />;
 

@@ -178,4 +178,32 @@ describe('Business Plan API Integration Tests', () => {
     expect((log.deletedData as any).title).toBe('Operations Plan Obsolete');
     expect(log.reason).toBe('Merged with market plan');
   });
+
+  it('should auto-assign sortOrder if not provided', async () => {
+    const payload1 = {
+      title: 'First Section',
+      content: 'Content 1',
+    };
+    const req1 = createAuthenticatedRequest('http://localhost/api/business-plan', {
+      method: 'POST',
+      body: JSON.stringify(payload1),
+    });
+    const res1 = await listPOST(req1);
+    expect(res1.status).toBe(201);
+    const body1 = await res1.json();
+    expect(body1.data.sortOrder).toBe(1);
+
+    const payload2 = {
+      title: 'Second Section',
+      content: 'Content 2',
+    };
+    const req2 = createAuthenticatedRequest('http://localhost/api/business-plan', {
+      method: 'POST',
+      body: JSON.stringify(payload2),
+    });
+    const res2 = await listPOST(req2);
+    expect(res2.status).toBe(201);
+    const body2 = await res2.json();
+    expect(body2.data.sortOrder).toBe(2);
+  });
 });

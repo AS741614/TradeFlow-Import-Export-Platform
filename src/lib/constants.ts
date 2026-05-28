@@ -191,11 +191,11 @@ export function getDefaultSwotItems(): SwotItem[] {
 
 export function getDefaultBusinessPlan(): BusinessPlanSection[] {
   return [
-    { id: generateId(), title: 'Executive Summary', content: 'Our import/export company connects global suppliers with buyers, leveraging technology to streamline operations, reduce costs, and deliver value across borders. We focus on quality products, reliable logistics, and transparent pricing.', order: 1 },
-    { id: generateId(), title: 'Market Analysis', content: 'The global trade market exceeds $25 trillion annually. Key growth sectors include electronics, textiles, and agricultural products. Digital B2B platforms are transforming how businesses discover partners and transact internationally.', order: 2 },
-    { id: generateId(), title: 'Operations Plan', content: 'We operate a lean model: sourcing products from verified suppliers, partnering with global freight forwarders, and maintaining quality through inspection protocols. All operations are managed through our TradeFlow platform.', order: 3 },
-    { id: generateId(), title: 'Go-to-Market Strategy', content: 'Phase 1: Direct outreach to target buyers via email campaigns and trade shows. Phase 2: Online presence through B2B marketplaces (Alibaba, TradeIndia, Global Sources). Phase 3: Build direct buyer relationships and repeat orders.', order: 4 },
-    { id: generateId(), title: 'Risk Assessment', content: 'Key risks include currency fluctuations, supply chain disruptions, regulatory changes, and payment defaults. Mitigation strategies include hedging, diversified supplier base, compliance monitoring, and trade credit insurance.', order: 5 },
+    { id: generateId(), title: 'Executive Summary', content: 'Our import/export company connects global suppliers with buyers, leveraging technology to streamline operations, reduce costs, and deliver value across borders. We focus on quality products, reliable logistics, and transparent pricing.', sortOrder: 1 },
+    { id: generateId(), title: 'Market Analysis', content: 'The global trade market exceeds $25 trillion annually. Key growth sectors include electronics, textiles, and agricultural products. Digital B2B platforms are transforming how businesses discover partners and transact internationally.', sortOrder: 2 },
+    { id: generateId(), title: 'Operations Plan', content: 'We operate a lean model: sourcing products from verified suppliers, partnering with global freight forwarders, and maintaining quality through inspection protocols. All operations are managed through our TradeFlow platform.', sortOrder: 3 },
+    { id: generateId(), title: 'Go-to-Market Strategy', content: 'Phase 1: Direct outreach to target buyers via email campaigns and trade shows. Phase 2: Online presence through B2B marketplaces (Alibaba, TradeIndia, Global Sources). Phase 3: Build direct buyer relationships and repeat orders.', sortOrder: 4 },
+    { id: generateId(), title: 'Risk Assessment', content: 'Key risks include currency fluctuations, supply chain disruptions, regulatory changes, and payment defaults. Mitigation strategies include hedging, diversified supplier base, compliance monitoring, and trade credit insurance.', sortOrder: 5 },
   ];
 }
 

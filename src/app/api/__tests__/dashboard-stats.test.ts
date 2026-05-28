@@ -26,6 +26,8 @@ describe('Dashboard Stats API Integration Tests', () => {
     await db.delete(dbSchema.campaigns);
     await db.delete(dbSchema.shipments);
     await db.delete(dbSchema.invoices);
+    await db.delete(dbSchema.swotItems);
+    await db.delete(dbSchema.businessPlanSections);
     
     // Seed default org and user via auth helper
     await seedTestAuth();
@@ -41,6 +43,8 @@ describe('Dashboard Stats API Integration Tests', () => {
     await db.delete(dbSchema.campaigns);
     await db.delete(dbSchema.shipments);
     await db.delete(dbSchema.invoices);
+    await db.delete(dbSchema.swotItems);
+    await db.delete(dbSchema.businessPlanSections);
     await db.delete(dbSchema.users);
     await db.delete(dbSchema.orgs);
   });
@@ -68,5 +72,11 @@ describe('Dashboard Stats API Integration Tests', () => {
     expect(body.data.tasksCount).toBe(12);
     expect(body.data.activeProductsCount).toBe(3); // 'in-stock' count: Cotton Fabric, LED Panel, Bamboo Board
     expect(body.data.pendingTasksCount).toBe(12);
+
+    // Verify SWOT and business plan sections are seeded
+    const swot = await db.select().from(dbSchema.swotItems);
+    expect(swot.length).toBe(12);
+    const bp = await db.select().from(dbSchema.businessPlanSections);
+    expect(bp.length).toBe(5);
   });
 });
