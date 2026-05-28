@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export const insertEmailTemplateSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Name is required').max(255),
   category: z.enum(['introduction', 'catalog', 'quotation', 'follow-up', 're-engagement', 'notification', 'custom']),
-  subject: z.string().min(1, 'Subject is required'),
-  body: z.string().min(1, 'Body is required'),
+  subject: z.string().min(1, 'Subject is required').max(255),
+  body: z.string().min(1, 'Body is required').max(10000),
   variables: z.array(z.string()).default([]),
   createdByUserId: z.string().uuid().nullable().optional(),
 });

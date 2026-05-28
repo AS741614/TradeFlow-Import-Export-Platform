@@ -1,12 +1,22 @@
 import { getDb } from '../client';
 import { businessPlanSections } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertBusinessPlanInput, UpdateBusinessPlanInput } from '../validation/business-plan';
 
-export async function getBusinessPlanSections(orgId: string) {
+export async function getBusinessPlanSections(orgId: string, limit?: number, offset?: number) {
   const db = getDb();
-  return db.select().from(businessPlanSections).where(withTenant(businessPlanSections, orgId));
+  const query = db.select().from(businessPlanSections).where(withTenant(businessPlanSections, orgId)).orderBy(asc(businessPlanSections.sortOrder));
+  if (limit !== undefined && offset !== undefined) {
+    return query.limit(limit).offset(offset);
+  }
+  if (limit !== undefined) {
+    return query.limit(limit);
+  }
+  if (offset !== undefined) {
+    return query.offset(offset);
+  }
+  return query;
 }
 
 export async function getBusinessPlanSectionById(orgId: string, id: string) {

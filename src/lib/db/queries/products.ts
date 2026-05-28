@@ -1,12 +1,22 @@
 import { getDb } from '../client';
 import { products } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertProductInput, UpdateProductInput } from '../validation/products';
 
-export async function getProducts(orgId: string) {
+export async function getProducts(orgId: string, limit?: number, offset?: number) {
   const db = getDb();
-  return db.select().from(products).where(withTenant(products, orgId));
+  const query = db.select().from(products).where(withTenant(products, orgId)).orderBy(desc(products.createdAt));
+  if (limit !== undefined && offset !== undefined) {
+    return query.limit(limit).offset(offset);
+  }
+  if (limit !== undefined) {
+    return query.limit(limit);
+  }
+  if (offset !== undefined) {
+    return query.offset(offset);
+  }
+  return query;
 }
 
 export async function getProductById(orgId: string, id: string) {

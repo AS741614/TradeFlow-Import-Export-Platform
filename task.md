@@ -1,26 +1,39 @@
-# Task Checklist - Prompt 11 (Tier 1 Critical Fixes & Bulk Import Foundation)
+# Task Checklist - Prompt 12: Tier 2 Important Fixes
 
-## Rate Limiting & Bypass (ADJUSTMENT 1)
-- [x] Implement rate limiter bypass check on `process.env.NODE_ENV === 'test'` or `process.env.DISABLE_RATE_LIMIT === 'true'` in `src/lib/rate-limiter.ts`.
-- [x] Implement/verify explicit test cases in `src/lib/__tests__/rate-limiter.test.ts`.
+## 1. Currency Enum & Shared Validations
+- [x] Create `src/lib/db/validation/_shared.ts` defining ISO_4217_CODES and `currencyEnumSchema`.
+- [x] Create `src/lib/__tests__/_shared-validation.test.ts` to test currency validations.
+- [x] Integrate `currencyEnumSchema` in:
+  - `src/lib/db/validation/invoices.ts`
+  - `src/lib/db/validation/products.ts`
+  - `src/lib/db/validation/cost-items.ts`
+  - `src/lib/db/validation/financial-projections.ts`
 
-## Error Sanitization & 401 Preservation (ADJUSTMENT 2)
-- [x] Check for `Unauthorized` error message first and return 401 status in `src/lib/db/error-sanitizer.ts`.
-- [x] Implement/verify explicit test case in `src/lib/__tests__/error-sanitizer.test.ts`.
-- [x] Confirm all 28 API routes catch blocks utilize `handleRouteError`.
+## 2. Tightened String Validations
+- [x] Add `.max(255)` string caps and description/long-text caps to all 14 schema validators.
 
-## Server-Side Dashboard Seeding (ADJUSTMENT 3)
-- [x] Verify sample data seeding is fully implemented in the `/api/dashboard/stats` endpoint (`src/lib/db/queries/dashboard.ts` and `src/app/api/dashboard/stats/route.ts`).
-- [x] Verify that ALL seeding is removed from `src/app/page.tsx`.
-- [x] Verify test cases in `src/app/api/__tests__/dashboard-stats.test.ts`.
+## 3. Invoice Arithmetic Validation
+- [x] Add subtotal + tax === total refinement to `insertInvoiceSchema` and `updateInvoiceSchema` in `src/lib/db/validation/invoices.ts`.
 
-## Reference Bulk Import (NOTE B)
-- [x] Implement Zod request body validation in `/api/contacts/bulk-import/route.ts`.
-- [x] Reject payloads with rows length > 1000 with a 413 Payload Too Large response.
-- [x] Implement database helper `bulkImportContacts` supporting continuation and transactional rollback in `src/lib/db/queries/contacts-bulk.ts`.
-- [x] Verify tests in `src/app/api/__tests__/contacts-bulk.test.ts`.
+## 4. Query Engine N+1 Fixes & Custom Logger
+- [x] Add built-in query count logging under test environments in `src/lib/db/client.ts`.
+- [x] Refactor `getInvoices` in `src/lib/db/queries/invoices.ts` to use a single subquery join query.
+- [x] Refactor `getShipments` in `src/lib/db/queries/shipments.ts` to use a single subquery join query.
+- [x] Implement/verify N+1 query regression test verifying query count <= 2.
 
-## Verification Gate (Section 6 Compliance)
+## 5. API Endpoints Pagination & Consistency
+- [x] Implement limit/offset query parameters parsing and separate count queries in all 13 entity GET list routes.
+- [x] Preserve backward-compatibility by ensuring the `data` array exists at the same place.
+- [x] Wrap `POST /api/email/send` response in `{ data: ... }` envelope.
+
+## 6. Contacts Email Index Migration
+- [x] Add index on `contacts.email` in `src/lib/db/schema/operations.ts`.
+- [x] Run `npx drizzle-kit generate` to scaffold migration.
+- [x] Review scaffolded migration SQL.
+- [x] Run `npx drizzle-kit migrate` (or push) after confirming SQL is correct.
+
+## 7. Documentation & Verification Gate
+- [x] Document changes in `README.md`.
 - [x] Verify Types: `npx tsc --noEmit`
 - [x] Lint Checks: `npm run lint`
 - [x] Unit & Integration Tests: `npm test`

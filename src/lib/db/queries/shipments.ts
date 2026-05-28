@@ -1,42 +1,112 @@
 import { getDb } from '../client';
 import { shipments, shipmentProducts, shipmentDocuments, products } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
 import type { InsertShipmentInput, UpdateShipmentInput } from '../validation/shipments';
 
-export async function getShipments(orgId: string) {
+export interface ShipmentProductInfo {
+  productId: string;
+  productName: string;
+  quantity: number;
+}
+
+export type GroupedShipment = typeof shipments.$inferSelect & {
+  products: ShipmentProductInfo[];
+  documents: (typeof shipmentDocuments.$inferSelect)[];
+};
+
+export async function getShipments(orgId: string, limit?: number, offset?: number): Promise<GroupedShipment[]> {
   const db = getDb();
   
-  // 1. Fetch shipments
-  const shipmentRows = await db.select().from(shipments).where(withTenant(shipments, orgId));
-  
-  // 2. Fetch products and documents for each shipment
-  const result = [];
-  for (const shipment of shipmentRows) {
-    const productsList = await db
-      .select({
+  const baseSubquery = db
+    .select({ id: shipments.id })
+    .from(shipments)
+    .where(withTenant(shipments, orgId))
+    .orderBy(desc(shipments.createdAt));
+
+  let idsTable;
+  if (limit !== undefined && offset !== undefined) {
+    idsTable = baseSubquery.limit(limit).offset(offset).as('ids');
+  } else if (limit !== undefined) {
+    idsTable = baseSubquery.limit(limit).as('ids');
+  } else if (offset !== undefined) {
+    idsTable = baseSubquery.offset(offset).as('ids');
+  } else {
+    idsTable = baseSubquery.as('ids');
+  }
+
+  // 2. Fetch shipments, products, and documents in a single query
+  const rows = await db
+    .select({
+      shipment: shipments,
+      shipmentProduct: {
         productId: shipmentProducts.productId,
         productName: products.name,
         quantity: shipmentProducts.quantity,
-      })
-      .from(shipmentProducts)
-      .leftJoin(products, eq(shipmentProducts.productId, products.id))
-      .where(eq(shipmentProducts.shipmentId, shipment.id));
+      },
+      document: shipmentDocuments,
+    })
+    .from(shipments)
+    .innerJoin(idsTable, eq(shipments.id, idsTable.id))
+    .leftJoin(shipmentProducts, eq(shipments.id, shipmentProducts.shipmentId))
+    .leftJoin(products, eq(shipmentProducts.productId, products.id))
+    .leftJoin(shipmentDocuments, eq(shipments.id, shipmentDocuments.shipmentId))
+    .orderBy(desc(shipments.createdAt));
 
-    const documentsList = await db
-      .select()
-      .from(shipmentDocuments)
-      .where(eq(shipmentDocuments.shipmentId, shipment.id));
+  // 3. Group the results in memory, maintaining ordering and deduplicating
+  const shipmentMap = new Map<string, GroupedShipment>();
+  const orderedIds: string[] = [];
 
-    result.push({
-      ...shipment,
-      products: productsList,
-      documents: documentsList,
-    });
+  for (const row of rows) {
+    const shId = row.shipment.id;
+    let current = shipmentMap.get(shId);
+    if (!current) {
+      orderedIds.push(shId);
+      current = {
+        ...row.shipment,
+        products: [],
+        documents: [],
+      };
+      shipmentMap.set(shId, current);
+    }
+
+    // Deduplicate products
+    const sp = row.shipmentProduct;
+    if (sp.productId !== null && sp.productName !== null && sp.quantity !== null) {
+      const prodId = sp.productId;
+      const prodName = sp.productName;
+      const qty = sp.quantity;
+      const prodExists = current.products.some(
+        (p) => p.productId === prodId
+      );
+      if (!prodExists) {
+        current.products.push({
+          productId: prodId,
+          productName: prodName,
+          quantity: qty,
+        });
+      }
+    }
+
+    // Deduplicate documents
+    const doc = row.document;
+    if (doc?.id) {
+      const docId = doc.id;
+      const docExists = current.documents.some(
+        (d) => d.id === docId
+      );
+      if (!docExists) {
+        current.documents.push(doc);
+      }
+    }
   }
-  
-  return result;
+
+  return orderedIds.map(id => {
+    const sh = shipmentMap.get(id);
+    if (!sh) throw new Error('Assertion failed: shipment not found in map');
+    return sh;
+  });
 }
 
 export async function getShipmentById(orgId: string, id: string, tx?: TxClient) {

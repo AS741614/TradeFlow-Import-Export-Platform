@@ -36,7 +36,29 @@ export function getLastRequest() {
 export async function seedTestAuth() {
   const db = getDb();
   
-  // Clean up user and org tables to avoid duplicate key violations
+  // Clean up all tables in dependency order to avoid foreign key violations
+  await db.delete(dbSchema.campaignContacts);
+  await db.delete(dbSchema.campaigns);
+  await db.delete(dbSchema.emailTemplates);
+  await db.delete(dbSchema.outreachContacts);
+  await db.delete(dbSchema.invoiceLineItems);
+  await db.delete(dbSchema.invoices);
+  await db.delete(dbSchema.shipmentProducts);
+  await db.delete(dbSchema.shipmentDocuments);
+  await db.delete(dbSchema.shipments);
+  await db.delete(dbSchema.complianceItems);
+  await db.delete(dbSchema.contacts);
+  await db.delete(dbSchema.products);
+  await db.delete(dbSchema.costItems);
+  await db.delete(dbSchema.financialProjections);
+  await db.delete(dbSchema.businessPlanSections);
+  await db.delete(dbSchema.swotItems);
+  await db.delete(dbSchema.tasks);
+  await db.delete(dbSchema.appMetadata);
+  await db.delete(dbSchema.deletionLogs);
+  await db.delete(dbSchema.accounts);
+  await db.delete(dbSchema.sessions);
+  await db.delete(dbSchema.verificationTokens);
   await db.delete(dbSchema.users);
   await db.delete(dbSchema.orgs);
 

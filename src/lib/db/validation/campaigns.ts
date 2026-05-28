@@ -12,14 +12,14 @@ export const campaignStatsSchema = z.object({
 });
 
 export const insertCampaignSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().min(1, 'Name is required').max(255),
   templateId: z.string().uuid('Template ID must be a valid UUID'),
   status: z.enum(['draft', 'scheduled', 'sending', 'paused', 'completed']),
   scheduleType: z.enum(['immediate', 'scheduled', 'drip']),
   scheduledAt: z.string().nullable().optional(),
   sendsPerHour: z.number().int().nullable().optional(),
-  subjectLineA: z.string().min(1, 'Subject line A is required'),
-  subjectLineB: z.string().nullable().optional(),
+  subjectLineA: z.string().min(1, 'Subject line A is required').max(255),
+  subjectLineB: z.string().max(255).nullable().optional(),
   stats: campaignStatsSchema.default({}),
   contactIds: z.array(z.string().uuid()).default([]),
   createdByUserId: z.string().uuid().nullable().optional(),

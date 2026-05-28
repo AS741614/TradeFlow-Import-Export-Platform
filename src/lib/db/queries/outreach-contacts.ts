@@ -1,12 +1,22 @@
 import { getDb } from '../client';
 import { outreachContacts } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertOutreachContactInput, UpdateOutreachContactInput } from '../validation/outreach-contacts';
 
-export async function getOutreachContacts(orgId: string) {
+export async function getOutreachContacts(orgId: string, limit?: number, offset?: number) {
   const db = getDb();
-  return db.select().from(outreachContacts).where(withTenant(outreachContacts, orgId));
+  const query = db.select().from(outreachContacts).where(withTenant(outreachContacts, orgId)).orderBy(desc(outreachContacts.importedAt));
+  if (limit !== undefined && offset !== undefined) {
+    return query.limit(limit).offset(offset);
+  }
+  if (limit !== undefined) {
+    return query.limit(limit);
+  }
+  if (offset !== undefined) {
+    return query.offset(offset);
+  }
+  return query;
 }
 
 export async function getOutreachContactById(orgId: string, id: string) {

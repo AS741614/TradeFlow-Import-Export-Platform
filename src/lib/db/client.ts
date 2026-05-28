@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import * as schema from './schema';
+import { Logger } from 'drizzle-orm/logger';
 
 // Manual lightweight parser for .env.local/env files to support scripts/test runners
 function loadEnv() {
@@ -29,6 +30,18 @@ loadEnv();
 let pool: Pool | null = null;
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
+export let queryHistory: { query: string; params: unknown[] }[] = [];
+
+export function clearQueryHistory() {
+  queryHistory = [];
+}
+
+class TestQueryLogger implements Logger {
+  logQuery(query: string, params: unknown[]): void {
+    queryHistory.push({ query, params });
+  }
+}
+
 export function getDb() {
   if (db) return db;
 
@@ -42,7 +55,11 @@ export function getDb() {
     max: 10, // Reused across route handlers, limit to 10 connections
   });
 
-  db = drizzle(pool, { schema });
+  const isTest = process.env.NODE_ENV === 'test';
+  db = drizzle(pool, { 
+    schema, 
+    logger: isTest ? new TestQueryLogger() : false 
+  });
   return db;
 }
 

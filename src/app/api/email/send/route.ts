@@ -21,9 +21,11 @@ export async function POST(request: Request) {
     void runCampaignSimulation(campaignId);
 
     return NextResponse.json({
-      success: true,
-      message: 'Campaign dispatched successfully',
-      campaignId,
+      data: {
+        success: true,
+        message: 'Campaign dispatched successfully',
+        campaignId,
+      }
     });
   } catch (error) {
     return handleRouteError(error);

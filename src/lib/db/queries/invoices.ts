@@ -1,39 +1,75 @@
 import { getDb } from '../client';
 import { invoices, invoiceLineItems, contacts } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
 import type { InsertInvoiceInput, UpdateInvoiceInput } from '../validation/invoices';
 
-export async function getInvoices(orgId: string) {
+export type GroupedInvoice = typeof invoices.$inferSelect & {
+  contactName: string;
+  lineItems: (typeof invoiceLineItems.$inferSelect)[];
+};
+
+export async function getInvoices(orgId: string, limit?: number, offset?: number): Promise<GroupedInvoice[]> {
   const db = getDb();
 
-  // 1. Fetch invoices joined with contacts to resolve contactName
-  const invoiceRows = await db
+  const baseSubquery = db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(withTenant(invoices, orgId))
+    .orderBy(desc(invoices.createdAt));
+
+  let idsTable;
+  if (limit !== undefined && offset !== undefined) {
+    idsTable = baseSubquery.limit(limit).offset(offset).as('ids');
+  } else if (limit !== undefined) {
+    idsTable = baseSubquery.limit(limit).as('ids');
+  } else if (offset !== undefined) {
+    idsTable = baseSubquery.offset(offset).as('ids');
+  } else {
+    idsTable = baseSubquery.as('ids');
+  }
+
+  // 2. Fetch invoices, line items, and contacts in a single query
+  const rows = await db
     .select({
       invoice: invoices,
       contactCompany: contacts.company,
+      lineItem: invoiceLineItems,
     })
     .from(invoices)
+    .innerJoin(idsTable, eq(invoices.id, idsTable.id))
     .leftJoin(contacts, eq(invoices.contactId, contacts.id))
-    .where(withTenant(invoices, orgId));
+    .leftJoin(invoiceLineItems, eq(invoices.id, invoiceLineItems.invoiceId))
+    .orderBy(desc(invoices.createdAt));
 
-  // 2. Fetch line items for each invoice
-  const result = [];
-  for (const row of invoiceRows) {
-    const lineItemsList = await db
-      .select()
-      .from(invoiceLineItems)
-      .where(eq(invoiceLineItems.invoiceId, row.invoice.id));
+  // 3. Group the results in memory, maintaining ordering
+  const invoiceMap = new Map<string, GroupedInvoice>();
+  const orderedIds: string[] = [];
 
-    result.push({
-      ...row.invoice,
-      contactName: row.contactCompany ?? 'Unknown Contact',
-      lineItems: lineItemsList,
-    });
+  for (const row of rows) {
+    const invId = row.invoice.id;
+    let inv = invoiceMap.get(invId);
+    if (!inv) {
+      orderedIds.push(invId);
+      inv = {
+        ...row.invoice,
+        contactName: row.contactCompany ?? 'Unknown Contact',
+        lineItems: [],
+      };
+      invoiceMap.set(invId, inv);
+    }
+
+    if (row.lineItem) {
+      inv.lineItems.push(row.lineItem);
+    }
   }
 
-  return result;
+  return orderedIds.map(id => {
+    const inv = invoiceMap.get(id);
+    if (!inv) throw new Error('Assertion failed: invoice not found in map');
+    return inv;
+  });
 }
 
 export async function getInvoiceById(orgId: string, id: string, tx?: TxClient) {

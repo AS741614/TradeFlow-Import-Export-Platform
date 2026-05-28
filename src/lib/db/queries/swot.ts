@@ -1,12 +1,22 @@
 import { getDb } from '../client';
 import { swotItems } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertSwotInput, UpdateSwotInput } from '../validation/swot';
 
-export async function getSwotItems(orgId: string) {
+export async function getSwotItems(orgId: string, limit?: number, offset?: number) {
   const db = getDb();
-  return db.select().from(swotItems).where(withTenant(swotItems, orgId));
+  const query = db.select().from(swotItems).where(withTenant(swotItems, orgId)).orderBy(desc(swotItems.id));
+  if (limit !== undefined && offset !== undefined) {
+    return query.limit(limit).offset(offset);
+  }
+  if (limit !== undefined) {
+    return query.limit(limit);
+  }
+  if (offset !== undefined) {
+    return query.offset(offset);
+  }
+  return query;
 }
 
 export async function getSwotItemById(orgId: string, id: string) {

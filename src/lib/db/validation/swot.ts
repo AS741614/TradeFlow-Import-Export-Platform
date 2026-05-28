@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const insertSwotSchema = z.object({
-  text: z.string().min(1, 'Text is required'),
+  text: z.string().min(1, 'Text is required').max(255),
   category: z.enum(['strength', 'weakness', 'opportunity', 'threat']),
   createdByUserId: z.string().uuid().nullable().optional(),
 });

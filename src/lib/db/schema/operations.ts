@@ -59,6 +59,7 @@ export const contacts = pgTable('contacts', {
 }, (table) => [
   index('idx_contacts_org_id').on(table.orgId),
   index('idx_contacts_created_by_user_id').on(table.createdByUserId),
+  index('idx_contacts_email').on(table.email),
 ]);
 
 // ==========================================

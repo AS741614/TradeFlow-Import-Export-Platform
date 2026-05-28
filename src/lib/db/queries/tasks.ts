@@ -1,12 +1,22 @@
 import { getDb } from '../client';
 import { tasks } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertTaskInput, UpdateTaskInput } from '../validation/tasks';
 
-export async function getTasks(orgId: string) {
+export async function getTasks(orgId: string, limit?: number, offset?: number) {
   const db = getDb();
-  return db.select().from(tasks).where(withTenant(tasks, orgId));
+  const query = db.select().from(tasks).where(withTenant(tasks, orgId)).orderBy(desc(tasks.createdAt));
+  if (limit !== undefined && offset !== undefined) {
+    return query.limit(limit).offset(offset);
+  }
+  if (limit !== undefined) {
+    return query.limit(limit);
+  }
+  if (offset !== undefined) {
+    return query.offset(offset);
+  }
+  return query;
 }
 
 export async function getTaskById(orgId: string, id: string) {

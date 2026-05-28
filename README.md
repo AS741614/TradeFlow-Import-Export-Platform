@@ -82,6 +82,8 @@ User accounts and organization tenants are created dynamically on the first visi
 
 ### API Specifications
 - **Format**: All route responses conform to `{ data: T | T[] }` or `{ error: string }`.
+  - **List Endpoints (Pagination)**: All 13 list GET routes support pagination via `limit` and `offset` query parameters. In addition to returning the `data` array, they append a metadata object: `{ data: T[], pagination: { limit: number, offset: number, total: number, hasMore: boolean } }`. This metadata is purely additive, ensuring that consumers expecting just `data` remain fully backward-compatible.
+  - **Email Dispatch Endpoint**: The `POST /api/email/send` route wraps its success payload inside a consistent envelope `{ data: { success: boolean, message: string, campaignId?: string } }`.
 - **Status Codes**:
   - `200 OK`: Successful read, update, or deletion.
   - `201 Created`: Successful creation.
