@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -22,12 +23,6 @@ describe('Invoices API Integration Tests', () => {
   let testContactId: string;
 
   beforeEach(async () => {
-    // Clear test tables in dependency order
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.invoiceLineItems);
-    await db.delete(dbSchema.invoices);
-    await db.delete(dbSchema.contacts);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
@@ -48,12 +43,7 @@ describe('Invoices API Integration Tests', () => {
 
   afterEach(async () => {
     // Clear tables to keep DB clean
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.invoiceLineItems);
-    await db.delete(dbSchema.invoices);
-    await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -236,14 +226,20 @@ describe('Invoices API Integration Tests', () => {
     const fetchLineItems = await db.select().from(dbSchema.invoiceLineItems);
     expect(fetchLineItems.length).toBe(0);
 
-    // Verify it is logged in deletion_logs
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    // Verify it is logged in activity_log
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('invoices');
-    expect(log.recordId).toBe(invoice.id);
-    expect((log.deletedData as any).number).toBe('INV-DELETE');
-    expect((log.deletedData as any).lineItems.length).toBe(1);
-    expect((log.deletedData as any).lineItems[0].description).toBe('Paid Service');
+    expect(log.entityType).toBe('invoice');
+    expect(log.entityId).toBe(invoice.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      const snap = summary.snapshot as Record<string, any>;
+      expect(snap.number).toBe('INV-DELETE');
+      expect(snap.lineItems.length).toBe(1);
+      expect(snap.lineItems[0].description).toBe('Paid Service');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
   });
 });

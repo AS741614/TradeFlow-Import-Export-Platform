@@ -12,6 +12,7 @@ import {
   mockAuthCall,
   TEST_ORG_ID,
   TEST_USER_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -22,20 +23,13 @@ describe('Outreach Contacts API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.outreachContacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
+    // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.outreachContacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -197,13 +191,18 @@ describe('Outreach Contacts API Integration Tests', () => {
     const fetchContacts = await db.select().from(dbSchema.outreachContacts);
     expect(fetchContacts.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('outreach_contacts');
-    expect(log.recordId).toBe(contact.id);
-    expect((log.deletedData as any).firstName).toBe('Charlie');
+    expect(log.entityType).toBe('outreach-contact');
+    expect(log.entityId).toBe(contact.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).firstName).toBe('Charlie');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
     expect(log.reason).toBe('Duplicate entry');
-    expect(log.deletedByUserId).toBe(TEST_USER_ID);
+    expect(log.userId).toBe(TEST_USER_ID);
   });
 });

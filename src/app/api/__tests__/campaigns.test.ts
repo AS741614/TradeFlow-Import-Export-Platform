@@ -12,6 +12,7 @@ import {
   mockAuthCall,
   TEST_ORG_ID,
   TEST_USER_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -25,14 +26,6 @@ describe('Campaigns API Integration Tests', () => {
   let contactId2: string;
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.campaignContacts);
-    await db.delete(dbSchema.campaigns);
-    await db.delete(dbSchema.emailTemplates);
-    await db.delete(dbSchema.outreachContacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
     await seedTestAuth();
     mockAuthSession();
 
@@ -72,13 +65,7 @@ describe('Campaigns API Integration Tests', () => {
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.campaignContacts);
-    await db.delete(dbSchema.campaigns);
-    await db.delete(dbSchema.emailTemplates);
-    await db.delete(dbSchema.outreachContacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -261,14 +248,13 @@ describe('Campaigns API Integration Tests', () => {
     const fetchJunctions = await db.select().from(dbSchema.campaignContacts);
     expect(fetchJunctions.length).toBe(0); // Cascade works!
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('campaigns');
-    expect(log.recordId).toBe(campaign.id);
-    expect((log.deletedData as any).name).toBe('To Be Deleted Campaign');
-    expect((log.deletedData as any).contactIds).toEqual([contactId1, contactId2]); // Saved successfully!
+    expect(log.entityType).toBe('campaign');
+    expect(log.entityId).toBe(campaign.id);
+    expect(log.changeSummary).toEqual({ snapshot: { ...campaign, contactIds: [contactId1, contactId2] } });
     expect(log.reason).toBe('End of quarter');
-    expect(log.deletedByUserId).toBe(TEST_USER_ID);
+    expect(log.userId).toBe(TEST_USER_ID);
   });
 });

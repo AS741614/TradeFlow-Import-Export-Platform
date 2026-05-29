@@ -12,6 +12,7 @@ import {
   mockAuthCall,
   TEST_ORG_ID,
   TEST_USER_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -22,20 +23,13 @@ describe('Email Templates API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.emailTemplates);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
+    // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.emailTemplates);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -180,13 +174,18 @@ describe('Email Templates API Integration Tests', () => {
     const fetchTemplates = await db.select().from(dbSchema.emailTemplates);
     expect(fetchTemplates.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('email_templates');
-    expect(log.recordId).toBe(template.id);
-    expect((log.deletedData as any).name).toBe('Temporary Catalog');
+    expect(log.entityType).toBe('email-template');
+    expect(log.entityId).toBe(template.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).name).toBe('Temporary Catalog');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
     expect(log.reason).toBe('Obsolete catalog');
-    expect(log.deletedByUserId).toBe(TEST_USER_ID);
+    expect(log.userId).toBe(TEST_USER_ID);
   });
 });

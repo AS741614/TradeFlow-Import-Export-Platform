@@ -10,6 +10,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -20,19 +21,12 @@ describe('App Metadata API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    // Clear dependencies and seed basic info
-    await db.delete(dbSchema.appMetadata);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.appMetadata);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 

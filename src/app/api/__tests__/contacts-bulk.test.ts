@@ -9,6 +9,7 @@ import {
   mockAuthSession,
   createAuthenticatedRequest,
   mockAuthCall,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 import { count } from 'drizzle-orm';
 
@@ -20,10 +21,6 @@ describe('Contacts Bulk Import API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    // Clear test tables in dependency order
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.contacts);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
@@ -31,10 +28,7 @@ describe('Contacts Bulk Import API Integration Tests', () => {
 
   afterEach(async () => {
     // Clear tables to keep DB clean
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
   });
 
   afterAll(async () => {

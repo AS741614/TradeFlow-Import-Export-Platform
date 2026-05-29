@@ -33,14 +33,27 @@ export const users = pgTable('users', {
   index('idx_users_org_id').on(table.orgId),
 ]);
 
-export const deletionLogs = pgTable('deletion_logs', {
+export type ActivityLogChangeSummary =
+  | { snapshot: Record<string, unknown> }  // for 'deleted'
+  | { created: Record<string, unknown> }   // for 'created'
+  | { before: Record<string, unknown>; after: Record<string, unknown>; changedFields: string[] }  // for 'updated'
+  | { count: number }                      // for 'bulk_imported'
+  | { count: number; ids: string[] };      // for 'bulk_deleted'
+
+export const activityLogs = pgTable('activity_log', {
   id: uuid('id').defaultRandom().primaryKey(),
-  tableName: varchar('table_name', { length: 100 }).notNull(),
-  recordId: uuid('record_id').notNull(),
-  deletedData: jsonb('deleted_data').notNull(),
-  deletedByUserId: uuid('deleted_by_user_id').references(() => users.id).notNull(),
-  deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  orgId: uuid('org_id').references(() => orgs.id).notNull(),
+  userId: uuid('user_id').references(() => users.id).notNull(),
+  entityType: varchar('entity_type', { length: 100 }).notNull(),
+  entityId: uuid('entity_id').notNull(),
+  action: text('action').notNull(),
+  changeSummary: jsonb('change_summary').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   reason: text('reason'),
 }, (table) => [
-  index('idx_deletion_logs_deleted_by_user_id').on(table.deletedByUserId),
+  index('idx_activity_log_org_created').on(table.orgId, table.createdAt),
+  index('idx_activity_log_entity').on(table.entityType, table.entityId),
 ]);
+

@@ -33,7 +33,7 @@ export function getLastRequest() {
   return lastRequest;
 }
 
-export async function seedTestAuth() {
+export async function clearDatabase() {
   const db = getDb();
   
   // Clean up all tables in dependency order to avoid foreign key violations
@@ -55,12 +55,17 @@ export async function seedTestAuth() {
   await db.delete(dbSchema.swotItems);
   await db.delete(dbSchema.tasks);
   await db.delete(dbSchema.appMetadata);
-  await db.delete(dbSchema.deletionLogs);
+  await db.delete(dbSchema.activityLogs);
   await db.delete(dbSchema.accounts);
   await db.delete(dbSchema.sessions);
   await db.delete(dbSchema.verificationTokens);
   await db.delete(dbSchema.users);
   await db.delete(dbSchema.orgs);
+}
+
+export async function seedTestAuth() {
+  const db = getDb();
+  await clearDatabase();
 
   await db.insert(dbSchema.orgs).values({
     id: TEST_ORG_ID,

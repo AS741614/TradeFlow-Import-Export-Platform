@@ -1,0 +1,15 @@
+BEGIN;
+ALTER TABLE "activity_log" RENAME TO "deletion_logs";
+ALTER TABLE "deletion_logs" RENAME COLUMN "entity_type" TO "table_name";
+ALTER TABLE "deletion_logs" RENAME COLUMN "entity_id" TO "record_id";
+ALTER TABLE "deletion_logs" RENAME COLUMN "user_id" TO "deleted_by_user_id";
+ALTER TABLE "deletion_logs" RENAME COLUMN "change_summary" TO "deleted_data";
+ALTER TABLE "deletion_logs" RENAME COLUMN "created_at" TO "deleted_at";
+ALTER TABLE "deletion_logs" DROP COLUMN "org_id";
+ALTER TABLE "deletion_logs" DROP COLUMN "action";
+ALTER TABLE "deletion_logs" DROP COLUMN "ip_address";
+ALTER TABLE "deletion_logs" DROP COLUMN "user_agent";
+DROP INDEX IF EXISTS "idx_activity_log_org_created";
+DROP INDEX IF EXISTS "idx_activity_log_entity";
+CREATE INDEX IF NOT EXISTS "idx_deletion_logs_deleted_by_user_id" ON "deletion_logs" ("deleted_by_user_id");
+COMMIT;

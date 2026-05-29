@@ -1,7 +1,7 @@
 import { eq, and, SQL } from 'drizzle-orm';
 import { PgColumn } from 'drizzle-orm/pg-core';
 import { getDb } from '../client';
-import { deletionLogs } from '../schema';
+import { activityLogs, users } from '../schema';
 
 interface HasOrgId {
   orgId: PgColumn;
@@ -18,7 +18,7 @@ export function withTenant(table: HasOrgId, orgId: string, condition?: SQL): SQL
 }
 
 /**
- * Helper to perform a hard delete inside a transaction, writing a snapshot to deletion_logs first.
+ * Helper to perform a hard delete inside a transaction, writing a snapshot to activity_log first.
  */
 export async function deleteWithLog<T>(
   tableName: string,
@@ -33,11 +33,35 @@ export async function deleteWithLog<T>(
     const data = await selectQuery(tx);
     if (data === null || data === undefined) return null;
 
-    await tx.insert(deletionLogs).values({
-      tableName,
-      recordId,
-      deletedData: data,
-      deletedByUserId: userId,
+    // Fetch user's orgId inside transaction
+    const [user] = await tx.select({ orgId: users.orgId }).from(users).where(eq(users.id, userId));
+    if (!user?.orgId) {
+      throw new Error(`User ${userId} has no associated organization`);
+    }
+
+    const TABLE_TO_ENTITY_TYPE: Record<string, string> = {
+      contacts: 'contact',
+      products: 'product',
+      shipments: 'shipment',
+      invoices: 'invoice',
+      compliance_items: 'compliance',
+      cost_items: 'cost-item',
+      financial_projections: 'financial-projection',
+      outreach_contacts: 'outreach-contact',
+      email_templates: 'email-template',
+      campaigns: 'campaign',
+      business_plan_sections: 'business-plan',
+      swot_items: 'swot',
+      tasks: 'task',
+    };
+
+    await tx.insert(activityLogs).values({
+      orgId: user.orgId,
+      userId,
+      entityType: TABLE_TO_ENTITY_TYPE[tableName] ?? tableName,
+      entityId: recordId,
+      action: 'deleted',
+      changeSummary: { snapshot: data as Record<string, unknown> },
       reason: reason ?? null,
     });
 
@@ -45,3 +69,4 @@ export async function deleteWithLog<T>(
     return data;
   });
 }
+

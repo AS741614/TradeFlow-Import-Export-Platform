@@ -12,6 +12,7 @@ import {
   mockAuthCall,
   TEST_ORG_ID,
   TEST_USER_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -22,10 +23,6 @@ describe('Contacts API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    // Clear test tables in dependency order
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.contacts);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
@@ -33,10 +30,7 @@ describe('Contacts API Integration Tests', () => {
 
   afterEach(async () => {
     // Clear tables to keep DB clean
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -183,14 +177,21 @@ describe('Contacts API Integration Tests', () => {
     const fetchRes = await db.select().from(dbSchema.contacts);
     expect(fetchRes.length).toBe(0);
 
-    // Verify it is logged in deletion_logs
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    // Verify it is logged in activity_log
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('contacts');
-    expect(log.recordId).toBe(inserted.id);
-    expect((log.deletedData as any).company).toBe('Delete Corp');
-    expect(log.deletedByUserId).toBe(TEST_USER_ID);
+    expect(log.entityType).toBe('contact');
+    expect(log.entityId).toBe(inserted.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).company).toBe('Delete Corp');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
+    expect(log.userId).toBe(TEST_USER_ID);
+    expect(log.orgId).toBe(TEST_ORG_ID);
+    expect(log.action).toBe('deleted');
     expect(log.reason).toBe('ClosedBusiness');
   });
 });

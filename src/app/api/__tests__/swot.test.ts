@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -21,19 +22,13 @@ describe('SWOT API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.swotItems);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.swotItems);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -162,12 +157,17 @@ describe('SWOT API Integration Tests', () => {
     const fetchItems = await db.select().from(dbSchema.swotItems);
     expect(fetchItems.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('swot_items');
-    expect(log.recordId).toBe(swot.id);
-    expect((log.deletedData as any).text).toBe('New trade tariffs from key partners');
+    expect(log.entityType).toBe('swot');
+    expect(log.entityId).toBe(swot.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).text).toBe('New trade tariffs from key partners');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
     expect(log.reason).toBe('Obsolete threat');
   });
 });

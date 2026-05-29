@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -21,19 +22,12 @@ describe('Business Plan API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.businessPlanSections);
-    
-    // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.businessPlanSections);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -170,12 +164,12 @@ describe('Business Plan API Integration Tests', () => {
     const fetchSections = await db.select().from(dbSchema.businessPlanSections);
     expect(fetchSections.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('business_plan_sections');
-    expect(log.recordId).toBe(section.id);
-    expect((log.deletedData as any).title).toBe('Operations Plan Obsolete');
+    expect(log.entityType).toBe('business-plan');
+    expect(log.entityId).toBe(section.id);
+    expect(log.changeSummary).toEqual({ snapshot: section });
     expect(log.reason).toBe('Merged with market plan');
   });
 

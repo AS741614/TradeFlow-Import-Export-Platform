@@ -36,7 +36,7 @@ describe('schema imports', () => {
     const EXPECTED_TABLES = [
       'orgs',
       'users',
-      'deletionLogs',
+      'activityLogs',
       'products',
       'contacts',
       'shipments',
@@ -75,7 +75,7 @@ describe('database integration', () => {
 
   beforeEach(async () => {
     // Clear test tables in reverse dependency order
-    await db.delete(schema.deletionLogs);
+    await db.delete(schema.activityLogs);
     await db.delete(schema.contacts);
     await db.delete(schema.users);
     await db.delete(schema.orgs);
@@ -83,7 +83,7 @@ describe('database integration', () => {
 
   afterEach(async () => {
     // Clean up after each test to keep DB pristine
-    await db.delete(schema.deletionLogs);
+    await db.delete(schema.activityLogs);
     await db.delete(schema.contacts);
     await db.delete(schema.users);
     await db.delete(schema.orgs);
@@ -223,7 +223,7 @@ describe('database integration', () => {
     expect(updatedContact.updatedAt).not.toBe(firstUpdatedAt);
   });
 
-  it('should insert a deletion_log record with a valid JSONB deleted_data blob', async () => {
+  it('should insert an activity_log record with a valid JSONB change_summary blob', async () => {
     const orgsResult = await db.insert(schema.orgs).values({
       name: 'Smoke Test Org',
       country: 'Canada',
@@ -234,7 +234,7 @@ describe('database integration', () => {
 
     const usersResult = await db.insert(schema.users).values({
       email: 'smoke-log@example.com',
-      displayName: 'Logger User',
+      displayName: 'Smoke User',
       orgId: org.id,
       role: 'member',
     }).returning();
@@ -248,19 +248,21 @@ describe('database integration', () => {
       type: 'buyer',
     };
 
-    const deletionLogsResult = await db.insert(schema.deletionLogs).values({
-      tableName: 'contacts',
-      recordId: '11111111-2222-3333-4444-555555555555',
-      deletedData: testDeletedData,
-      deletedByUserId: user.id,
+    const activityLogsResult = await db.insert(schema.activityLogs).values({
+      orgId: org.id,
+      entityType: 'contacts',
+      entityId: '11111111-2222-3333-4444-555555555555',
+      action: 'deleted',
+      changeSummary: { snapshot: testDeletedData },
+      userId: user.id,
       reason: 'User request',
     }).returning();
-    const log = deletionLogsResult[0];
+    const log = activityLogsResult[0];
     expect(log).toBeDefined();
     if (!log) return;
 
     expect(log.id).toBeDefined();
-    expect(log.deletedData).toEqual(testDeletedData);
-    expect(log.deletedByUserId).toBe(user.id);
+    expect(log.changeSummary).toEqual({ snapshot: testDeletedData });
+    expect(log.userId).toBe(user.id);
   });
 });

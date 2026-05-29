@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -21,19 +22,13 @@ describe('Cost Items API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.costItems);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.costItems);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -174,12 +169,17 @@ describe('Cost Items API Integration Tests', () => {
     const fetchItems = await db.select().from(dbSchema.costItems);
     expect(fetchItems.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('cost_items');
-    expect(log.recordId).toBe(costItem.id);
-    expect((log.deletedData as any).description).toBe('Trucking delivery fee');
+    expect(log.entityType).toBe('cost-item');
+    expect(log.entityId).toBe(costItem.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).description).toBe('Trucking delivery fee');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
     expect(log.reason).toBe('Cancelled service');
   });
 });

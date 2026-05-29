@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -21,19 +22,13 @@ describe('Financial Projections API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.financialProjections);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
   });
 
   afterEach(async () => {
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.financialProjections);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -178,12 +173,17 @@ describe('Financial Projections API Integration Tests', () => {
     const fetchProj = await db.select().from(dbSchema.financialProjections);
     expect(fetchProj.length).toBe(0);
 
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('financial_projections');
-    expect(log.recordId).toBe(proj.id);
-    expect((log.deletedData as any).month).toBe('April 2026');
+    expect(log.entityType).toBe('financial-projection');
+    expect(log.entityId).toBe(proj.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      expect((summary.snapshot as Record<string, unknown>).month).toBe('April 2026');
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
     expect(log.reason).toBe('Stale data');
   });
 });

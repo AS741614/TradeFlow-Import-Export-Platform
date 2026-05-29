@@ -8,6 +8,7 @@ import {
   mockAuthSession,
   createAuthenticatedRequest,
   mockAuthCall,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -18,17 +19,6 @@ describe('Dashboard Stats API Integration Tests', () => {
   const db = getDb();
 
   beforeEach(async () => {
-    // Clear test tables in dependency order
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.tasks);
-    await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.products);
-    await db.delete(dbSchema.campaigns);
-    await db.delete(dbSchema.shipments);
-    await db.delete(dbSchema.invoices);
-    await db.delete(dbSchema.swotItems);
-    await db.delete(dbSchema.businessPlanSections);
-    
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
@@ -36,17 +26,7 @@ describe('Dashboard Stats API Integration Tests', () => {
 
   afterEach(async () => {
     // Clear tables to keep DB clean
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.tasks);
-    await db.delete(dbSchema.contacts);
-    await db.delete(dbSchema.products);
-    await db.delete(dbSchema.campaigns);
-    await db.delete(dbSchema.shipments);
-    await db.delete(dbSchema.invoices);
-    await db.delete(dbSchema.swotItems);
-    await db.delete(dbSchema.businessPlanSections);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
   });
 
   afterAll(async () => {

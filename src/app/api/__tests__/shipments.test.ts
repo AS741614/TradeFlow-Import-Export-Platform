@@ -11,6 +11,7 @@ import {
   createAuthenticatedRequest,
   mockAuthCall,
   TEST_ORG_ID,
+  clearDatabase,
 } from './_helpers/auth-fixture';
 
 vi.mock('@/lib/auth', () => ({
@@ -22,15 +23,6 @@ describe('Shipments API Integration Tests', () => {
   let testProductId: string;
 
   beforeEach(async () => {
-    // Clear test tables in dependency order
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.shipmentProducts);
-    await db.delete(dbSchema.shipmentDocuments);
-    await db.delete(dbSchema.shipments);
-    await db.delete(dbSchema.products);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
-
     // Seed default org and user via auth helper
     await seedTestAuth();
     mockAuthSession();
@@ -55,13 +47,7 @@ describe('Shipments API Integration Tests', () => {
 
   afterEach(async () => {
     // Clear tables to keep DB clean
-    await db.delete(dbSchema.deletionLogs);
-    await db.delete(dbSchema.shipmentProducts);
-    await db.delete(dbSchema.shipmentDocuments);
-    await db.delete(dbSchema.shipments);
-    await db.delete(dbSchema.products);
-    await db.delete(dbSchema.users);
-    await db.delete(dbSchema.orgs);
+    await clearDatabase();
     setLastRequest(null);
   });
 
@@ -236,14 +222,20 @@ describe('Shipments API Integration Tests', () => {
     const fetchDocs = await db.select().from(dbSchema.shipmentDocuments);
     expect(fetchDocs.length).toBe(0);
 
-    // Verify it is logged in deletion_logs (with nested products and docs snapshot!)
-    const logRes = await db.select().from(dbSchema.deletionLogs);
+    // Verify it is logged in activity_log (with nested products and docs snapshot!)
+    const logRes = await db.select().from(dbSchema.activityLogs);
     expect(logRes.length).toBe(1);
     const log = logRes[0]!;
-    expect(log.tableName).toBe('shipments');
-    expect(log.recordId).toBe(shipment.id);
-    expect((log.deletedData as any).reference).toBe('SHIP-DELETE');
-    expect((log.deletedData as any).products.length).toBe(1);
-    expect((log.deletedData as any).products[0].quantity).toBe(200);
+    expect(log.entityType).toBe('shipment');
+    expect(log.entityId).toBe(shipment.id);
+    const summary = log.changeSummary;
+    if (summary && typeof summary === 'object' && 'snapshot' in summary) {
+      const snap = summary.snapshot as Record<string, any>;
+      expect(snap.reference).toBe('SHIP-DELETE');
+      expect(snap.products.length).toBe(1);
+      expect(snap.products[0].quantity).toBe(200);
+    } else {
+      throw new Error('Expected deletion snapshot in changeSummary');
+    }
   });
 });
