@@ -3,11 +3,13 @@ import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getEmailTemplates, createEmailTemplate } from '@/lib/db/queries/email-templates';
 import { insertEmailTemplateSchema } from '@/lib/db/validation/email-templates';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
+import { logActivity } from '@/lib/audit-logger';
 
 import { getDb } from '@/lib/db/client';
 import { emailTemplates } from '@/lib/db/schema';
 import { withTenant } from '@/lib/db/queries/base';
-import { count } from 'drizzle-orm';
+import { count, and } from 'drizzle-orm';
+import { applySearchFilterSort } from '@/lib/db/queries/search-helpers';
 
 export async function GET(req?: NextRequest) {
   try {
@@ -15,9 +17,9 @@ export async function GET(req?: NextRequest) {
     
     let limit = 50;
     let offset = 0;
+    const searchParams = req ? new URL(req.url).searchParams : new URLSearchParams();
     
     if (req) {
-      const { searchParams } = new URL(req.url);
       const limitParam = searchParams.get('limit');
       const offsetParam = searchParams.get('offset');
       if (limitParam !== null) {
@@ -34,14 +36,35 @@ export async function GET(req?: NextRequest) {
       }
     }
 
+    const config = {
+      searchColumns: [emailTemplates.name, emailTemplates.subject],
+      sortByWhitelist: ['name', 'subject', 'createdAt'],
+      sortByColumnMap: {
+        name: emailTemplates.name,
+        subject: emailTemplates.subject,
+        createdAt: emailTemplates.createdAt,
+      },
+      defaultSortColumn: emailTemplates.createdAt,
+    };
+
+    const { whereClause, orderClause } = applySearchFilterSort(searchParams, config);
+
     const db = getDb();
+    let conditions = withTenant(emailTemplates, session.orgId);
+    if (whereClause) {
+      const merged = and(conditions, whereClause);
+      if (merged) {
+        conditions = merged;
+      }
+    }
+
     const [countResult] = await db
       .select({ total: count() })
       .from(emailTemplates)
-      .where(withTenant(emailTemplates, session.orgId));
+      .where(conditions);
     const total = countResult?.total ?? 0;
 
-    const list = await getEmailTemplates(session.orgId, limit, offset);
+    const list = await getEmailTemplates(session.orgId, limit, offset, whereClause, orderClause);
     const hasMore = offset + limit < total;
 
     return NextResponse.json({
@@ -62,6 +85,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const record = await createEmailTemplate(session.orgId, parsed.data);
+    
+    // Log template creation
+    await logActivity({
+      orgId: session.orgId,
+      userId: session.userId,
+      entityType: 'email-template',
+      entityId: record.id,
+      action: 'created',
+      changeSummary: { created: record },
+    });
+
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

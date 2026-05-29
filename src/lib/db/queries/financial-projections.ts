@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { financialProjections } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertFinancialProjectionInput, UpdateFinancialProjectionInput } from '../validation/financial-projections';
 
-export async function getFinancialProjections(orgId: string, limit?: number, offset?: number) {
+export async function getFinancialProjections(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(financialProjections).where(withTenant(financialProjections, orgId)).orderBy(desc(financialProjections.id));
+  let conditions = withTenant(financialProjections, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(financialProjections).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(financialProjections.id));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

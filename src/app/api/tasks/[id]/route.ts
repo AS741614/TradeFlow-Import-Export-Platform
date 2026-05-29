@@ -3,6 +3,7 @@ import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getTaskById, updateTask, deleteTask } from '@/lib/db/queries/tasks';
 import { updateTaskSchema } from '@/lib/db/validation/tasks';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
+import { logActivity, getDiff } from '@/lib/audit-logger';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,10 +28,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
+
+    // Fetch state before update for diff calculation
+    const before = await getTaskById(session.orgId, id);
+    if (!before) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
     const record = await updateTask(session.orgId, id, parsed.data);
     if (!record) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+
+    // Log the diff of changed fields
+    const diff = getDiff(before, record);
+    await logActivity({
+      orgId: session.orgId,
+      userId: session.userId,
+      entityType: 'task',
+      entityId: id,
+      action: 'updated',
+      changeSummary: diff,
+    });
+
     return NextResponse.json({ data: record });
   } catch (error) {
     return handleRouteError(error);

@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { contacts } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertContactInput, UpdateContactInput } from '../validation/contacts';
 
-export async function getContacts(orgId: string, limit?: number, offset?: number) {
+export async function getContacts(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(contacts).where(withTenant(contacts, orgId)).orderBy(desc(contacts.createdAt));
+  let conditions = withTenant(contacts, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(contacts).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(contacts.createdAt));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

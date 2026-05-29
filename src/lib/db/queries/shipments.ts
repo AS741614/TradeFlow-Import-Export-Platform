@@ -1,6 +1,6 @@
 import { getDb } from '../client';
 import { shipments, shipmentProducts, shipmentDocuments, products } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
 import type { InsertShipmentInput, UpdateShipmentInput } from '../validation/shipments';
@@ -16,14 +16,27 @@ export type GroupedShipment = typeof shipments.$inferSelect & {
   documents: (typeof shipmentDocuments.$inferSelect)[];
 };
 
-export async function getShipments(orgId: string, limit?: number, offset?: number): Promise<GroupedShipment[]> {
+export async function getShipments(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL): Promise<GroupedShipment[]> {
   const db = getDb();
   
+  let conditions = withTenant(shipments, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+
   const baseSubquery = db
     .select({ id: shipments.id })
     .from(shipments)
-    .where(withTenant(shipments, orgId))
-    .orderBy(desc(shipments.createdAt));
+    .where(conditions);
+
+  if (orderBy) {
+    baseSubquery.orderBy(orderBy);
+  } else {
+    baseSubquery.orderBy(desc(shipments.createdAt));
+  }
 
   let idsTable;
   if (limit !== undefined && offset !== undefined) {
@@ -37,7 +50,7 @@ export async function getShipments(orgId: string, limit?: number, offset?: numbe
   }
 
   // 2. Fetch shipments, products, and documents in a single query
-  const rows = await db
+  const query = db
     .select({
       shipment: shipments,
       shipmentProduct: {
@@ -51,8 +64,15 @@ export async function getShipments(orgId: string, limit?: number, offset?: numbe
     .innerJoin(idsTable, eq(shipments.id, idsTable.id))
     .leftJoin(shipmentProducts, eq(shipments.id, shipmentProducts.shipmentId))
     .leftJoin(products, eq(shipmentProducts.productId, products.id))
-    .leftJoin(shipmentDocuments, eq(shipments.id, shipmentDocuments.shipmentId))
-    .orderBy(desc(shipments.createdAt));
+    .leftJoin(shipmentDocuments, eq(shipments.id, shipmentDocuments.shipmentId));
+
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(shipments.createdAt));
+  }
+
+  const rows = await query;
 
   // 3. Group the results in memory, maintaining ordering and deduplicating
   const shipmentMap = new Map<string, GroupedShipment>();

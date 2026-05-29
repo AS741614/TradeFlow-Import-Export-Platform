@@ -3,6 +3,7 @@ import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getBusinessPlanSections, createBusinessPlanSection } from '@/lib/db/queries/business-plan';
 import { insertBusinessPlanSchema } from '@/lib/db/validation/business-plan';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
+import { logActivity } from '@/lib/audit-logger';
 
 import { getDb } from '@/lib/db/client';
 import { businessPlanSections } from '@/lib/db/schema';
@@ -62,6 +63,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const record = await createBusinessPlanSection(session.orgId, parsed.data);
+    
+    // Log business-plan creation
+    await logActivity({
+      orgId: session.orgId,
+      userId: session.userId,
+      entityType: 'business-plan',
+      entityId: record.id,
+      action: 'created',
+      changeSummary: { created: record },
+    });
+
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

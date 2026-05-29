@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { tasks } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertTaskInput, UpdateTaskInput } from '../validation/tasks';
 
-export async function getTasks(orgId: string, limit?: number, offset?: number) {
+export async function getTasks(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(tasks).where(withTenant(tasks, orgId)).orderBy(desc(tasks.createdAt));
+  let conditions = withTenant(tasks, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(tasks).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(tasks.createdAt));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

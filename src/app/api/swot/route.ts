@@ -3,6 +3,7 @@ import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getSwotItems, createSwotItem } from '@/lib/db/queries/swot';
 import { insertSwotSchema } from '@/lib/db/validation/swot';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
+import { logActivity } from '@/lib/audit-logger';
 
 import { getDb } from '@/lib/db/client';
 import { swotItems } from '@/lib/db/schema';
@@ -62,6 +63,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const record = await createSwotItem(session.orgId, parsed.data);
+    
+    // Log swot item creation
+    await logActivity({
+      orgId: session.orgId,
+      userId: session.userId,
+      entityType: 'swot',
+      entityId: record.id,
+      action: 'created',
+      changeSummary: { created: record },
+    });
+
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { emailTemplates } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertEmailTemplateInput, UpdateEmailTemplateInput } from '../validation/email-templates';
 
-export async function getEmailTemplates(orgId: string, limit?: number, offset?: number) {
+export async function getEmailTemplates(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(emailTemplates).where(withTenant(emailTemplates, orgId)).orderBy(desc(emailTemplates.createdAt));
+  let conditions = withTenant(emailTemplates, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(emailTemplates).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(emailTemplates.createdAt));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

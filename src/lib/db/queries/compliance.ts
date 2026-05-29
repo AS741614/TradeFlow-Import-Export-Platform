@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { complianceItems } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertComplianceInput, UpdateComplianceInput } from '../validation/compliance';
 
-export async function getComplianceItems(orgId: string, limit?: number, offset?: number) {
+export async function getComplianceItems(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(complianceItems).where(withTenant(complianceItems, orgId)).orderBy(desc(complianceItems.requiredBy));
+  let conditions = withTenant(complianceItems, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(complianceItems).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(complianceItems.requiredBy));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

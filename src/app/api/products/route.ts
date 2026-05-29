@@ -3,11 +3,13 @@ import { handleRouteError } from '@/lib/db/error-sanitizer';
 import { getProducts, createProduct } from '@/lib/db/queries/products';
 import { insertProductSchema } from '@/lib/db/validation/products';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
+import { logActivity } from '@/lib/audit-logger';
 
 import { getDb } from '@/lib/db/client';
 import { products } from '@/lib/db/schema';
 import { withTenant } from '@/lib/db/queries/base';
-import { count } from 'drizzle-orm';
+import { count, and } from 'drizzle-orm';
+import { applySearchFilterSort } from '@/lib/db/queries/search-helpers';
 
 export async function GET(req?: NextRequest) {
   try {
@@ -15,9 +17,9 @@ export async function GET(req?: NextRequest) {
     
     let limit = 50;
     let offset = 0;
+    const searchParams = req ? new URL(req.url).searchParams : new URLSearchParams();
     
     if (req) {
-      const { searchParams } = new URL(req.url);
       const limitParam = searchParams.get('limit');
       const offsetParam = searchParams.get('offset');
       if (limitParam !== null) {
@@ -34,14 +36,41 @@ export async function GET(req?: NextRequest) {
       }
     }
 
+    const config = {
+      searchColumns: [products.name, products.sku, products.hsCode, products.category, products.supplier, products.origin],
+      statusColumn: products.status,
+      sortByWhitelist: ['name', 'sku', 'hsCode', 'category', 'quantity', 'unitCost', 'status', 'createdAt'],
+      sortByColumnMap: {
+        name: products.name,
+        sku: products.sku,
+        hsCode: products.hsCode,
+        category: products.category,
+        quantity: products.quantity,
+        unitCost: products.unitCost,
+        status: products.status,
+        createdAt: products.createdAt,
+      },
+      defaultSortColumn: products.createdAt,
+    };
+
+    const { whereClause, orderClause } = applySearchFilterSort(searchParams, config);
+
     const db = getDb();
+    let conditions = withTenant(products, session.orgId);
+    if (whereClause) {
+      const merged = and(conditions, whereClause);
+      if (merged) {
+        conditions = merged;
+      }
+    }
+
     const [countResult] = await db
       .select({ total: count() })
       .from(products)
-      .where(withTenant(products, session.orgId));
+      .where(conditions);
     const total = countResult?.total ?? 0;
 
-    const list = await getProducts(session.orgId, limit, offset);
+    const list = await getProducts(session.orgId, limit, offset, whereClause, orderClause);
     const hasMore = offset + limit < total;
 
     return NextResponse.json({
@@ -62,6 +91,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
     const record = await createProduct(session.orgId, parsed.data);
+    
+    // Log product creation
+    await logActivity({
+      orgId: session.orgId,
+      userId: session.userId,
+      entityType: 'product',
+      entityId: record.id,
+      action: 'created',
+      changeSummary: { created: record },
+    });
+
     return NextResponse.json({ data: record }, { status: 201 });
   } catch (error) {
     return handleRouteError(error);

@@ -1,6 +1,6 @@
 import { getDb } from '../client';
 import { invoices, invoiceLineItems, contacts } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { TxClient } from './base';
 import type { InsertInvoiceInput, UpdateInvoiceInput } from '../validation/invoices';
@@ -10,14 +10,27 @@ export type GroupedInvoice = typeof invoices.$inferSelect & {
   lineItems: (typeof invoiceLineItems.$inferSelect)[];
 };
 
-export async function getInvoices(orgId: string, limit?: number, offset?: number): Promise<GroupedInvoice[]> {
+export async function getInvoices(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL): Promise<GroupedInvoice[]> {
   const db = getDb();
+
+  let conditions = withTenant(invoices, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
 
   const baseSubquery = db
     .select({ id: invoices.id })
     .from(invoices)
-    .where(withTenant(invoices, orgId))
-    .orderBy(desc(invoices.createdAt));
+    .where(conditions);
+
+  if (orderBy) {
+    baseSubquery.orderBy(orderBy);
+  } else {
+    baseSubquery.orderBy(desc(invoices.createdAt));
+  }
 
   let idsTable;
   if (limit !== undefined && offset !== undefined) {
@@ -31,7 +44,7 @@ export async function getInvoices(orgId: string, limit?: number, offset?: number
   }
 
   // 2. Fetch invoices, line items, and contacts in a single query
-  const rows = await db
+  const query = db
     .select({
       invoice: invoices,
       contactCompany: contacts.company,
@@ -40,8 +53,15 @@ export async function getInvoices(orgId: string, limit?: number, offset?: number
     .from(invoices)
     .innerJoin(idsTable, eq(invoices.id, idsTable.id))
     .leftJoin(contacts, eq(invoices.contactId, contacts.id))
-    .leftJoin(invoiceLineItems, eq(invoices.id, invoiceLineItems.invoiceId))
-    .orderBy(desc(invoices.createdAt));
+    .leftJoin(invoiceLineItems, eq(invoices.id, invoiceLineItems.invoiceId));
+
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(invoices.createdAt));
+  }
+
+  const rows = await query;
 
   // 3. Group the results in memory, maintaining ordering
   const invoiceMap = new Map<string, GroupedInvoice>();

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { throwIfNotAuthenticated } from '@/lib/auth-server';
 import { bulkImportContacts } from '@/lib/db/queries/contacts-bulk';
 import { handleRouteError } from '@/lib/db/error-sanitizer';
+import { logActivity } from '@/lib/audit-logger';
 
 // Route-level request body schema validation (Note B)
 const bulkImportRequestSchema = z.object({
@@ -29,6 +30,20 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await bulkImportContacts(session.orgId, rows, continueOnError !== false);
+
+    if (result.imported > 0) {
+      await logActivity({
+        orgId: session.orgId,
+        userId: session.userId,
+        entityType: 'contact',
+        entityId: '00000000-0000-0000-0000-000000000000',
+        action: 'bulk_imported',
+        changeSummary: {
+          count: result.imported,
+        },
+      });
+    }
+
     return NextResponse.json({ data: result });
   } catch (error) {
     return handleRouteError(error);

@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { costItems } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertCostItemInput, UpdateCostItemInput } from '../validation/cost-items';
 
-export async function getCostItems(orgId: string, limit?: number, offset?: number) {
+export async function getCostItems(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(costItems).where(withTenant(costItems, orgId)).orderBy(desc(costItems.id));
+  let conditions = withTenant(costItems, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(costItems).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(costItems.id));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

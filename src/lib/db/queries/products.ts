@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { products } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertProductInput, UpdateProductInput } from '../validation/products';
 
-export async function getProducts(orgId: string, limit?: number, offset?: number) {
+export async function getProducts(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const query = db.select().from(products).where(withTenant(products, orgId)).orderBy(desc(products.createdAt));
+  let conditions = withTenant(products, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const query = db.select().from(products).where(conditions);
+  if (orderBy) {
+    query.orderBy(orderBy);
+  } else {
+    query.orderBy(desc(products.createdAt));
+  }
   if (limit !== undefined && offset !== undefined) {
     return query.limit(limit).offset(offset);
   }

@@ -1,12 +1,24 @@
 import { getDb } from '../client';
 import { campaigns, campaignContacts } from '../schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, SQL } from 'drizzle-orm';
 import { withTenant, deleteWithLog } from './base';
 import type { InsertCampaignInput, UpdateCampaignInput } from '../validation/campaigns';
 
-export async function getCampaigns(orgId: string, limit?: number, offset?: number) {
+export async function getCampaigns(orgId: string, limit?: number, offset?: number, where?: SQL, orderBy?: SQL) {
   const db = getDb();
-  const baseQuery = db.select().from(campaigns).where(withTenant(campaigns, orgId)).orderBy(desc(campaigns.createdAt));
+  let conditions = withTenant(campaigns, orgId);
+  if (where) {
+    const merged = and(conditions, where);
+    if (merged) {
+      conditions = merged;
+    }
+  }
+  const baseQuery = db.select().from(campaigns).where(conditions);
+  if (orderBy) {
+    baseQuery.orderBy(orderBy);
+  } else {
+    baseQuery.orderBy(desc(campaigns.createdAt));
+  }
   let campaignRows;
   if (limit !== undefined && offset !== undefined) {
     campaignRows = await baseQuery.limit(limit).offset(offset);
