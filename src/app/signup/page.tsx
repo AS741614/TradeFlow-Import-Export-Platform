@@ -8,9 +8,9 @@ export default async function SignupPage() {
   const db = getDb();
   const [result] = await db.select({ value: count() }).from(users);
 
-  if (result && result.value > 0) {
-    redirect('/login');
-  }
+  // if (result && result.value > 0) {
+  //   redirect('/login');
+  // }
 
   return <SignupForm />;
 }

@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { getItems } from '@/lib/storage';
-import { formatCurrency, formatNumber } from '@/lib/utils';
-import type { Task } from '@/lib/types';
+import { formatCurrency, formatNumber, formatDate } from '@/lib/utils';
+import type { Task, ActivityLog } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import Link from 'next/link';
 
 interface MetricData {
   label: string;
@@ -32,6 +35,7 @@ function MetricIcon({ name }: { name: string }) {
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [urgentTasks, setUrgentTasks] = useState<Task[]>([]);
+  const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +70,18 @@ export default function DashboardPage() {
           dashboardTasks = await getItems<Task>('tasks');
         }
 
+        // 3. Fetch recent activity logs (limit 10)
+        let logs: ActivityLog[] = [];
+        try {
+          const logsRes = await fetch('/api/activity-log?limit=10');
+          if (logsRes.ok) {
+            const logsData = (await logsRes.json()) as { data: ActivityLog[] };
+            logs = logsData.data;
+          }
+        } catch (err) {
+          console.error('Failed to load recent activity logs:', err);
+        }
+
         if (!cancelled) {
           const completedTasks = stats.tasksCount - stats.pendingTasksCount;
           const lowStock = stats.productsCount - stats.activeProductsCount;
@@ -82,6 +98,7 @@ export default function DashboardPage() {
           ]);
 
           setUrgentTasks(dashboardTasks.filter(t => t.priority === 'urgent' || t.priority === 'high').slice(0, 5));
+          setRecentLogs(logs);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof StorageError ? err.message : 'Failed to load dashboard metrics');
@@ -95,6 +112,12 @@ export default function DashboardPage() {
     };
   }, []);
 
+  function formatLogAction(log: ActivityLog) {
+    const entity = log.entityType.replace(/-/, ' ');
+    const action = log.action.replace(/_/, ' ');
+    return `${action.charAt(0).toUpperCase() + action.slice(1)} ${entity}`;
+  }
+
   if (loading) return <Loading />;
 
   return (
@@ -104,7 +127,7 @@ export default function DashboardPage() {
       <div className="page-header">
         <div className="page-header-top">
           <h1>Dashboard</h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-secondary text-sm">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
@@ -112,7 +135,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid-4" style={{ marginBottom: 'var(--space-xl)' }}>
+      <div className="grid-4">
         {metrics.map((metric) => (
           <div key={metric.label} className={`metric-card ${metric.color} stagger-item`}>
             <div className={`metric-card-icon ${metric.color}`}>
@@ -126,52 +149,38 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Two-column layout: Recent activity + Quick actions */}
-      <div className="grid-2">
+      {/* Three-column layout: Recent activity + Quick actions + Priority Tasks */}
+      <div className="grid-3">
         {/* Urgent Tasks */}
-        <div className="card">
-          <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-lg)' }}>
-            🔥 Priority Tasks
-          </h3>
+        <Card header={<h3 className="text-md font-semibold">🔥 Priority Tasks</h3>}>
           {urgentTasks.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+            <div className="stack-2">
               {urgentTasks.map((task) => (
-                <div key={task.id} className="stagger-item" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 'var(--space-md)',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)',
-                }}>
+                <div key={task.id} className="priority-task-item stagger-item">
                   <div>
-                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
+                    <div className="text-sm font-medium">
                       {task.title}
                     </div>
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                    <div className="text-xs text-tertiary priority-task-category">
                       {task.category}
                     </div>
                   </div>
-                  <span className={`badge ${task.priority === 'urgent' ? 'status-danger' : 'status-warning'}`}>
+                  <Badge variant={task.priority === 'urgent' ? 'danger' : 'warning'}>
                     {task.priority}
-                  </span>
+                  </Badge>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+            <p className="text-sm text-tertiary">
               No urgent tasks. Looking good! ✨
             </p>
           )}
-        </div>
+        </Card>
 
         {/* Quick Actions */}
-        <div className="card">
-          <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-lg)' }}>
-            ⚡ Quick Actions
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+        <Card header={<h3 className="text-md font-semibold">⚡ Quick Actions</h3>}>
+          <div className="quick-actions-grid">
             {[
               { label: 'Add Product', href: '/operations/inventory', icon: '📦' },
               { label: 'New Shipment', href: '/operations/shipments', icon: '🚢' },
@@ -182,41 +191,51 @@ export default function DashboardPage() {
               { label: 'Business Plan', href: '/business-plan', icon: '📊' },
               { label: 'View Projects', href: '/projects', icon: '📋' },
             ].map((action) => (
-              <a
+              <Link
                 key={action.label}
                 href={action.href}
-                className="stagger-item"
                 id={`quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-md)',
-                  padding: 'var(--space-md)',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-primary)',
-                  transition: 'all 200ms ease',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-accent)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)';
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(0)';
-                }}
+                className="quick-action-button stagger-item"
               >
-                <span style={{ fontSize: '1.25rem' }}>{action.icon}</span>
-                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)' }}>
-                  {action.label}
-                </span>
-              </a>
+                <span>{action.icon}</span>
+                <span>{action.label}</span>
+              </Link>
             ))}
           </div>
-        </div>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card header={<h3 className="text-md font-semibold">⏳ Recent Activity</h3>}>
+          {recentLogs.length > 0 ? (
+            <div className="activity-timeline">
+              {recentLogs.map((log) => (
+                <div key={log.id} className="activity-item stagger-item">
+                  <div className="activity-icon">
+                    {log.entityType === 'products' && '📦'}
+                    {log.entityType === 'shipments' && '🚢'}
+                    {log.entityType === 'invoices' && '📄'}
+                    {log.entityType === 'contacts' && '👤'}
+                    {log.entityType === 'campaigns' && '✉️'}
+                    {log.entityType === 'tasks' && '📋'}
+                    {!['products', 'shipments', 'invoices', 'contacts', 'campaigns', 'tasks'].includes(log.entityType) && '⚙️'}
+                  </div>
+                  <div className="activity-details">
+                    <div className="activity-action">
+                      {formatLogAction(log)}
+                    </div>
+                    <div className="activity-time">
+                      {formatDate(log.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-tertiary">
+              No recent activity. Perform some actions to see them logged! ⚙️
+            </p>
+          )}
+        </Card>
       </div>
     </div>
   );

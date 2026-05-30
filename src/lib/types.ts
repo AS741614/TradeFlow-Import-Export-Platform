@@ -263,3 +263,19 @@ export interface NavItem {
   icon: string;
   children?: NavItem[] | undefined;
 }
+
+// ---- Audit & Activity Logging ----
+
+export interface ActivityLog {
+  id: string;
+  orgId: string;
+  userId: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  changeSummary: Record<string, unknown>;
+  ipAddress?: string | null | undefined;
+  userAgent?: string | null | undefined;
+  createdAt: string;
+  reason?: string | null | undefined;
+}

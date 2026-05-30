@@ -7,6 +7,11 @@ import type { BusinessPlanSection, SwotItem } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { FormSection } from '@/components/ui/FormSection';
+import { FormField } from '@/components/ui/FormField';
+import { Button } from '@/components/ui/Button';
 
 export default function BusinessPlanPage() {
   const [sections, setSections] = useState<BusinessPlanSection[]>([]);
@@ -105,11 +110,8 @@ export default function BusinessPlanPage() {
     }
   };
 
-
-
   const currentSection = sections.find((s) => s.id === activeTab);
 
-  // Completion calculation (e.g. how many sections are not default/empty or simple length checks)
   const totalSections = sections.length;
   const sectionsCompleted = sections.filter((s) => s.content.trim().length > 20).length;
   const swotCount = swotItems.length;
@@ -124,50 +126,49 @@ export default function BusinessPlanPage() {
       <div className="page-header">
         <div className="page-header-top">
           <h1>Business Plan & Strategy</h1>
-          <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', background: 'var(--bg-secondary)', padding: '6px 12px', borderRadius: 'var(--radius-full)' }}>
+          <Badge variant="neutral">
             Saved: {formatDate(lastSaved)}
-          </div>
+          </Badge>
         </div>
         <p>Draft your export strategy, perform SWOT audits, and outline project KPIs directly on-platform.</p>
       </div>
 
       {/* Strategic KPIs */}
-      <div className="grid-4" style={{ marginBottom: 'var(--space-xl)' }}>
-        <div className="metric-card blue stagger-item">
+      <div className="grid-4">
+        <Card className="metric-card blue stagger-item">
           <div className="metric-card-content">
             <div className="metric-card-label">Total Sections</div>
             <div className="metric-card-value">{totalSections}</div>
           </div>
-        </div>
-        <div className="metric-card emerald stagger-item">
+        </Card>
+        <Card className="metric-card emerald stagger-item">
           <div className="metric-card-content">
             <div className="metric-card-label">Completion Status</div>
             <div className="metric-card-value">{completionPercentage}%</div>
+            <div className="progress-bar-container">
+              <div className="progress-bar-fill" style={{ width: `${String(completionPercentage)}%` }} />
+            </div>
           </div>
-        </div>
-        <div className="metric-card amber stagger-item">
+        </Card>
+        <Card className="metric-card amber stagger-item">
           <div className="metric-card-content">
             <div className="metric-card-label">SWOT Matrix Items</div>
             <div className="metric-card-value">{swotCount}</div>
           </div>
-        </div>
-        <div className="metric-card purple stagger-item">
+        </Card>
+        <Card className="metric-card purple stagger-item">
           <div className="metric-card-content">
             <div className="metric-card-label">Strategic Focus</div>
             <div className="metric-card-value">Export Launch</div>
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Main Layout: Tabbed section editor */}
-      <div className="grid-2" style={{ gridTemplateColumns: '3fr 2fr', gap: 'var(--space-xl)' }}>
+      <div className="grid-2" style={{ gridTemplateColumns: '3fr 2fr' }}>
         
         {/* Left Side: Business Plan Section Editor */}
-        <div className="card">
-          <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-md)' }}>
-            📝 Document Editor
-          </h3>
-          
+        <Card header={<h3 className="text-md font-semibold">📝 Document Editor</h3>}>
           <div className="tabs">
             {sections.map((section) => (
               <button
@@ -182,196 +183,187 @@ export default function BusinessPlanPage() {
           </div>
 
           {currentSection ? (
-            <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
-                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>
-                  {currentSection.title}
-                </span>
-                <span style={{ fontSize: 'var(--font-size-xxs)', color: 'var(--text-tertiary)' }}>
-                  Auto-saved on keystroke
-                </span>
-              </div>
-              <textarea
+            <FormSection
+              id="bp-editor-section"
+              title={currentSection.title}
+              description="Auto-saved on keystroke"
+            >
+              <FormField
                 id={`textarea-section-${currentSection.id}`}
-                className="form-textarea"
-                value={currentSection.content}
-                onChange={(e) => { void handleSectionTextChange(currentSection.id, e.target.value); }}
-                style={{ minHeight: '300px', fontFamily: 'inherit', lineHeight: '1.6', fontSize: 'var(--font-size-sm)', padding: 'var(--space-md)' }}
-                placeholder={`Draft details for ${currentSection.title}...`}
-              />
-            </div>
+              >
+                <textarea
+                  className="form-textarea bp-editor-textarea"
+                  value={currentSection.content}
+                  onChange={(e) => { void handleSectionTextChange(currentSection.id, e.target.value); }}
+                  placeholder={`Draft details for ${currentSection.title}...`}
+                />
+              </FormField>
+            </FormSection>
           ) : (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-sm)' }}>
+            <p className="text-sm text-tertiary">
               Select a section tab above to start writing.
             </p>
           )}
-        </div>
+        </Card>
 
         {/* Right Side: SWOT Matrix */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
-          <div className="card" style={{ paddingBottom: 'var(--space-md)' }}>
-            <h3 style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-lg)' }}>
-              📊 SWOT Matrix
-            </h3>
+        <Card header={<h3 className="text-md font-semibold">📊 SWOT Matrix</h3>}>
+          <div className="swot-grid">
             
-            <div className="swot-grid">
-              
-              {/* STRENGTHS */}
-              <div className="swot-quadrant strength">
-                <h3>💪 Strengths</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {swotItems.filter((i) => i.category === 'strength').map((item) => (
-                    <div key={item.id} className="swot-item animate-scale-in">
-                      <span>{item.text}</span>
-                      <button
-                        id={`btn-delete-swot-${item.id}`}
-                        onClick={() => { void handleDeleteSwotItem(item.id); }}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: 'var(--space-sm)' }}>
-                  <input
-                    id="input-swot-strength-add"
-                    className="form-input"
-                    type="text"
-                    placeholder="Add strength..."
-                    value={newStrength}
-                    onChange={(e) => setNewStrength(e.target.value)}
-                    style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newStrength, 'strength'); }}
-                  />
-                  <button
-                    id="btn-add-swot-strength"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => { void handleAddSwotItem(newStrength, 'strength'); }}
-                  >
-                    +
-                  </button>
-                </div>
+            {/* STRENGTHS */}
+            <div className="swot-quadrant strength">
+              <h3>💪 Strengths</h3>
+              <div className="swot-list">
+                {swotItems.filter((i) => i.category === 'strength').map((item) => (
+                  <div key={item.id} className="swot-item animate-scale-in">
+                    <span>{item.text}</span>
+                    <button
+                      id={`btn-delete-swot-${item.id}`}
+                      onClick={() => { void handleDeleteSwotItem(item.id); }}
+                      className="swot-delete-btn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-
-              {/* WEAKNESSES */}
-              <div className="swot-quadrant weakness">
-                <h3>⚠️ Weaknesses</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {swotItems.filter((i) => i.category === 'weakness').map((item) => (
-                    <div key={item.id} className="swot-item animate-scale-in">
-                      <span>{item.text}</span>
-                      <button
-                        id={`btn-delete-swot-${item.id}`}
-                        onClick={() => { void handleDeleteSwotItem(item.id); }}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: 'var(--space-sm)' }}>
-                  <input
-                    id="input-swot-weakness-add"
-                    className="form-input"
-                    type="text"
-                    placeholder="Add weakness..."
-                    value={newWeakness}
-                    onChange={(e) => setNewWeakness(e.target.value)}
-                    style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newWeakness, 'weakness'); }}
-                  />
-                  <button
-                    id="btn-add-swot-weakness"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => { void handleAddSwotItem(newWeakness, 'weakness'); }}
-                  >
-                    +
-                  </button>
-                </div>
+              <div className="swot-add-row">
+                <input
+                  id="input-swot-strength-add"
+                  className="form-input swot-input"
+                  type="text"
+                  placeholder="Add strength..."
+                  value={newStrength}
+                  onChange={(e) => setNewStrength(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newStrength, 'strength'); }}
+                />
+                <Button
+                  id="btn-add-swot-strength"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { void handleAddSwotItem(newStrength, 'strength'); }}
+                >
+                  +
+                </Button>
               </div>
-
-              {/* OPPORTUNITIES */}
-              <div className="swot-quadrant opportunity">
-                <h3>🚀 Opportunities</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {swotItems.filter((i) => i.category === 'opportunity').map((item) => (
-                    <div key={item.id} className="swot-item animate-scale-in">
-                      <span>{item.text}</span>
-                      <button
-                        id={`btn-delete-swot-${item.id}`}
-                        onClick={() => { void handleDeleteSwotItem(item.id); }}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: 'var(--space-sm)' }}>
-                  <input
-                    id="input-swot-opportunity-add"
-                    className="form-input"
-                    type="text"
-                    placeholder="Add opportunity..."
-                    value={newOpportunity}
-                    onChange={(e) => setNewOpportunity(e.target.value)}
-                    style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newOpportunity, 'opportunity'); }}
-                  />
-                  <button
-                    id="btn-add-swot-opportunity"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => { void handleAddSwotItem(newOpportunity, 'opportunity'); }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {/* THREATS */}
-              <div className="swot-quadrant threat">
-                <h3>🔥 Threats</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {swotItems.filter((i) => i.category === 'threat').map((item) => (
-                    <div key={item.id} className="swot-item animate-scale-in">
-                      <span>{item.text}</span>
-                      <button
-                        id={`btn-delete-swot-${item.id}`}
-                        onClick={() => { void handleDeleteSwotItem(item.id); }}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--accent-red)', padding: '2px' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: '4px', marginTop: 'var(--space-sm)' }}>
-                  <input
-                    id="input-swot-threat-add"
-                    className="form-input"
-                    type="text"
-                    placeholder="Add threat..."
-                    value={newThreat}
-                    onChange={(e) => setNewThreat(e.target.value)}
-                    style={{ height: '30px', fontSize: 'var(--font-size-xs)' }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newThreat, 'threat'); }}
-                  />
-                  <button
-                    id="btn-add-swot-threat"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => { void handleAddSwotItem(newThreat, 'threat'); }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
             </div>
-          </div>
-        </div>
 
+            {/* WEAKNESSES */}
+            <div className="swot-quadrant weakness">
+              <h3>⚠️ Weaknesses</h3>
+              <div className="swot-list">
+                {swotItems.filter((i) => i.category === 'weakness').map((item) => (
+                  <div key={item.id} className="swot-item animate-scale-in">
+                    <span>{item.text}</span>
+                    <button
+                      id={`btn-delete-swot-${item.id}`}
+                      onClick={() => { void handleDeleteSwotItem(item.id); }}
+                      className="swot-delete-btn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="swot-add-row">
+                <input
+                  id="input-swot-weakness-add"
+                  className="form-input swot-input"
+                  type="text"
+                  placeholder="Add weakness..."
+                  value={newWeakness}
+                  onChange={(e) => setNewWeakness(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newWeakness, 'weakness'); }}
+                />
+                <Button
+                  id="btn-add-swot-weakness"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { void handleAddSwotItem(newWeakness, 'weakness'); }}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+            {/* OPPORTUNITIES */}
+            <div className="swot-quadrant opportunity">
+              <h3>🚀 Opportunities</h3>
+              <div className="swot-list">
+                {swotItems.filter((i) => i.category === 'opportunity').map((item) => (
+                  <div key={item.id} className="swot-item animate-scale-in">
+                    <span>{item.text}</span>
+                    <button
+                      id={`btn-delete-swot-${item.id}`}
+                      onClick={() => { void handleDeleteSwotItem(item.id); }}
+                      className="swot-delete-btn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="swot-add-row">
+                <input
+                  id="input-swot-opportunity-add"
+                  className="form-input swot-input"
+                  type="text"
+                  placeholder="Add opportunity..."
+                  value={newOpportunity}
+                  onChange={(e) => setNewOpportunity(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newOpportunity, 'opportunity'); }}
+                />
+                <Button
+                  id="btn-add-swot-opportunity"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { void handleAddSwotItem(newOpportunity, 'opportunity'); }}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+            {/* THREATS */}
+            <div className="swot-quadrant threat">
+              <h3>🔥 Threats</h3>
+              <div className="swot-list">
+                {swotItems.filter((i) => i.category === 'threat').map((item) => (
+                  <div key={item.id} className="swot-item animate-scale-in">
+                    <span>{item.text}</span>
+                    <button
+                      id={`btn-delete-swot-${item.id}`}
+                      onClick={() => { void handleDeleteSwotItem(item.id); }}
+                      className="swot-delete-btn"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="swot-add-row">
+                <input
+                  id="input-swot-threat-add"
+                  className="form-input swot-input"
+                  type="text"
+                  placeholder="Add threat..."
+                  value={newThreat}
+                  onChange={(e) => setNewThreat(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void handleAddSwotItem(newThreat, 'threat'); }}
+                />
+                <Button
+                  id="btn-add-swot-threat"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { void handleAddSwotItem(newThreat, 'threat'); }}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        </Card>
       </div>
     </div>
   );

@@ -3,8 +3,12 @@
 import { useState, useTransition } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { COUNTRIES } from '@/lib/constants';
 import { signUpUser } from './actions';
+import { Card } from '@/components/ui/Card';
+import { FormField } from '@/components/ui/FormField';
+import { Button } from '@/components/ui/Button';
 
 export default function SignupForm() {
   const [displayName, setDisplayName] = useState('');
@@ -63,94 +67,66 @@ export default function SignupForm() {
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-      <div className="card" style={{ width: '450px', padding: 'var(--space-xl)' }}>
-        <h2 style={{ textAlign: 'center', marginBottom: 'var(--space-md)' }}>Create Owner Account</h2>
-        <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-lg)' }}>
+    <div className="auth-container">
+      <Card className="auth-card">
+        <h2 className="auth-title">Create Owner Account</h2>
+        <p className="auth-subtitle">
           TradeFlow self-registration: Bootstrap your organization.
         </p>
 
         {error && (
-          <div style={{ padding: 'var(--space-md)', background: '#fde8e8', borderLeft: '4px solid var(--accent-red)', color: 'var(--accent-red)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
+          <div className="auth-error-banner" role="alert">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-          <div>
-            <label id="label-name" htmlFor="input-name" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Full Name
-            </label>
+        <form onSubmit={handleSignup} className="auth-form">
+          <FormField id="input-name" label="Full Name">
             <input
-              id="input-name"
               type="text"
-              className="form-input"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="John Doe"
               required
               disabled={isPending}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label id="label-email" htmlFor="input-email" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Email address
-            </label>
+          <FormField id="input-email" label="Email address">
             <input
-              id="input-email"
               type="email"
-              className="form-input"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
               disabled={isPending}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label id="label-password" htmlFor="input-password" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Password
-            </label>
+          <FormField id="input-password" label="Password" hint="Must contain at least 12 characters.">
             <input
-              id="input-password"
               type="password"
-              className="form-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Min 12 characters"
               required
               disabled={isPending}
             />
-            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: '4px', display: 'block' }}>
-              Must contain at least 12 characters.
-            </span>
-          </div>
+          </FormField>
 
-          <div>
-            <label id="label-org-name" htmlFor="input-org-name" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Organization Name
-            </label>
+          <FormField id="input-org-name" label="Organization Name">
             <input
-              id="input-org-name"
               type="text"
-              className="form-input"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
               placeholder="TradeFlow Global"
               required
               disabled={isPending}
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label id="label-country" htmlFor="select-country" style={{ display: 'block', fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-medium)', marginBottom: '4px' }}>
-              Base Country
-            </label>
+          <FormField id="select-country" label="Base Country">
             <select
-              id="select-country"
-              className="form-select"
               value={country}
               onChange={(e) => setCountry(e.target.value)}
               required
@@ -162,22 +138,26 @@ export default function SignupForm() {
                 </option>
               ))}
             </select>
-          </div>
+          </FormField>
 
-          <button id="btn-signup-submit" type="submit" className="btn btn-primary" style={{ marginTop: 'var(--space-sm)' }} disabled={isPending}>
+          <Button
+            id="btn-signup-submit"
+            type="submit"
+            variant="primary"
+            disabled={isPending}
+            className="auth-submit-btn"
+          >
             {isPending ? 'Registering...' : 'Register Owner & Org'}
-          </button>
+          </Button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 'var(--space-md)' }}>
-          <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-            Already have an account?{' '}
-            <a href="/login" id="link-goto-login" style={{ color: 'var(--accent-blue)', fontWeight: 'var(--font-weight-medium)' }}>
-              Sign In
-            </a>
-          </span>
-        </div>
-      </div>
+        <p className="auth-footer">
+          Already have an account?{' '}
+          <Link href="/login" id="link-goto-login" className="auth-footer-link">
+            Sign In
+          </Link>
+        </p>
+      </Card>
     </div>
   );
 }

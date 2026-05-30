@@ -1,46 +1,25 @@
-# Task Checklist - Phase 15B: Refactor Forms and Tables to Design System Primitives
+# Task Checklist - Phase 15C: Polish Navigation, Dashboard, Business Plan, Auth, and Activity Log
 
-## 1. UI Primitives Creation
-- [x] Create UI primitives under `src/components/ui/`
-  - [x] `FormField.tsx` (generic input wrapper)
-  - [x] `FormSection.tsx` (input grouping section)
-  - [x] `DataTable.tsx` (generic typed data table)
-  - [x] `TableActions.tsx` (bulk action drawer)
-  - [x] `Modal.tsx` (native focus-trapped overlay)
-  - [x] `ConfirmDialog.tsx` (native confirm popup)
+## Step 1: Layout & Navigation Shell
+- [ ] Modify `src/lib/constants.ts` (Add Activity Log to NAV_ITEMS)
+- [ ] Create `src/components/layout/AppLayoutShell.tsx` (Root client layout router/shell)
+- [ ] Modify `src/app/layout.tsx` (Fetch session + org details server-side, render AppLayoutShell)
+- [ ] Modify `src/components/layout/Sidebar.tsx` (Polished layout, collapsible navigation, active highlights, mobile drawer)
+- [ ] Modify `src/components/layout/TopBar.tsx` (Hamburger drawer toggle, profile menu details, search placeholder)
+- [ ] Checkpoint 1 Verification (npx tsc --noEmit && npm run lint && npm test)
 
-## 2. Primitive Unit Tests
-- [x] Create Unit Tests for Primitives under `src/components/ui/__tests__/`
-  - [x] `FormField.test.tsx`
-  - [x] `FormSection.test.tsx`
-  - [x] `DataTable.test.tsx`
-  - [x] `TableActions.test.tsx`
-  - [x] `Modal.test.tsx`
-  - [x] `ConfirmDialog.test.tsx`
+## Step 2: Dashboard & Business Plan Pages
+- [ ] Modify `src/app/page.tsx` (Polished dashboard, recent activity feed, quick actions, Card/Badge updates)
+- [ ] Modify `src/app/business-plan/page.tsx` (SWOT 2x2 grid, editor tabs with FormSection/FormField, progress bar)
+- [ ] Checkpoint 2 Verification (npx tsc --noEmit && npm run lint && npm test)
 
-## 3. Operations & Outreach Contacts Refactor
-- [x] Refactor Operations Contacts (`src/app/operations/contacts/page.tsx`)
-- [x] Refactor Outreach Contacts (`src/app/outreach/contacts/page.tsx`)
+## Step 3: Auth & Activity Log Pages
+- [ ] Modify `src/app/login/page.tsx` (Styled inputs, visible Sign Up redirection link, Google login button)
+- [ ] Modify `src/app/signup/signup-form.tsx` (Styled inputs via FormField, signup layout alignment)
+- [ ] Create `src/app/activity-log/page.tsx` (Timeline list page, categories filter, pagination footer)
+- [ ] Checkpoint 3 Verification (npx tsc --noEmit && npm run lint && npm test)
 
-## 4. Main Operational Modules Refactor
-- [x] Refactor Compliance Tracking (`src/app/operations/compliance/page.tsx`)
-- [x] Refactor Inventory Catalog (`src/app/operations/inventory/page.tsx`)
-- [x] Refactor Billing & Invoices (`src/app/operations/invoices/page.tsx`)
-- [x] Refactor Shipments Logistics (`src/app/operations/shipments/page.tsx`)
-
-## 5. Outreach & Campaigns Refactor
-- [x] Refactor Email Campaigns (`src/app/outreach/campaigns/page.tsx`)
-- [x] Refactor Email Templates (`src/app/outreach/templates/page.tsx`)
-
-## 6. Finance & Kanban Board Refactor
-- [x] Refactor Finance Overview (`src/app/finance/page.tsx`)
-- [x] Refactor Projections Dashboard (`src/app/finance/projections/page.tsx`)
-- [x] Refactor Margins Calculator (`src/app/finance/margins/page.tsx`)
-- [x] Refactor Kanban Projects Board (`src/app/projects/page.tsx`)
-
-## 7. Verification Gate
-- [x] Type check: `npx tsc --noEmit`
-- [x] Lint checks: `npm run lint`
-- [x] Unit & Integration tests (run 3 times): `npm test`
-- [x] Production build: `npm run build`
-- [x] Conventional Commit & push
+## Step 4: Final Verification & Visual Checkpoints
+- [ ] Final Verification (tsc + lint + test x3 stability + build)
+- [ ] Visual verification screenshots using `/browser`
+- [ ] Commit & Push changes to remote

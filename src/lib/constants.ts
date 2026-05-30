@@ -46,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Tracking', href: '/outreach/tracking', icon: 'tracking' },
     ],
   },
+  { label: 'Activity Log', href: '/activity-log', icon: 'activity' },
 ];
 
 // ---- Product Categories ----
