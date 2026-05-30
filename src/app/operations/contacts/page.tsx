@@ -8,6 +8,8 @@ import type { Contact, ContactType, ContactStatus } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const EMPTY_FORM = {
   company: '',
@@ -282,163 +284,127 @@ export default function ContactsPage() {
       )}
 
       {/* Add / Edit Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Contact' : 'Add Contact'}</h2>
-              <button id="btn-close-contact-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-contact-company">Company Name *</label>
-                  <input
-                    id="input-contact-company"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Pacific Trade Ltd."
-                    value={form.company}
-                    onChange={(e) => updateField('company', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-contact-person">Contact Person *</label>
-                  <input
-                    id="input-contact-person"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. John Doe"
-                    value={form.contactPerson}
-                    onChange={(e) => updateField('contactPerson', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-contact-email">Email Address *</label>
-                  <input
-                    id="input-contact-email"
-                    className="form-input"
-                    type="email"
-                    placeholder="e.g. contact@pacifictrade.com"
-                    value={form.email}
-                    onChange={(e) => updateField('email', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-contact-phone">Phone Number</label>
-                  <input
-                    id="input-contact-phone"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. +1 (555) 0199"
-                    value={form.phone}
-                    onChange={(e) => updateField('phone', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-contact-country">Country</label>
-                  <select
-                    id="select-contact-country"
-                    className="form-select"
-                    value={form.country}
-                    onChange={(e) => updateField('country', e.target.value)}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-contact-incoterms">Preferred Incoterms</label>
-                  <select
-                    id="select-contact-incoterms"
-                    className="form-select"
-                    value={form.tradeTerms}
-                    onChange={(e) => updateField('tradeTerms', e.target.value)}
-                  >
-                    {INCOTERMS.map((term) => (
-                      <option key={term} value={term}>{term}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-contact-type">Relationship Type</label>
-                  <select
-                    id="select-contact-type"
-                    className="form-select"
-                    value={form.type}
-                    onChange={(e) => updateField('type', e.target.value as ContactType)}
-                  >
-                    <option value="buyer">Buyer</option>
-                    <option value="supplier">Supplier</option>
-                    <option value="both">Both (Partner)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-contact-status">Status</label>
-                  <select
-                    id="select-contact-status"
-                    className="form-select"
-                    value={form.status}
-                    onChange={(e) => updateField('status', e.target.value as ContactStatus)}
-                  >
-                    <option value="active">Active</option>
-                    <option value="prospect">Prospect</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="input-contact-address">Address</label>
-                <input
-                  id="input-contact-address"
-                  className="form-input"
-                  type="text"
-                  placeholder="Street, City, State, ZIP"
-                  value={form.address}
-                  onChange={(e) => updateField('address', e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="textarea-contact-notes">Notes / Special Agreements</label>
-                <textarea
-                  id="textarea-contact-notes"
-                  className="form-textarea"
-                  placeholder="Notes on communication style, trade history, specific requirements..."
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-contact" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-contact"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.company.trim() || !form.contactPerson.trim() || !form.email.trim()}
-              >
-                {editingId ? 'Update Contact' : 'Add Contact'}
-              </button>
-            </div>
-          </div>
+      <Modal
+        id="modal-contact"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Contact' : 'Add Contact'}
+        footer={
+          <>
+            <button id="btn-cancel-contact" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-contact"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.company.trim() || !form.contactPerson.trim() || !form.email.trim()}
+            >
+              {editingId ? 'Update Contact' : 'Add Contact'}
+            </button>
+          </>
+        }
+        className="modal-lg"
+      >
+        <div className="form-row">
+          <FormField id="input-contact-company" label="Company Name" required>
+            <input
+              type="text"
+              placeholder="e.g. Pacific Trade Ltd."
+              value={form.company}
+              onChange={(e) => updateField('company', e.target.value)}
+            />
+          </FormField>
+          <FormField id="input-contact-person" label="Contact Person" required>
+            <input
+              type="text"
+              placeholder="e.g. John Doe"
+              value={form.contactPerson}
+              onChange={(e) => updateField('contactPerson', e.target.value)}
+            />
+          </FormField>
         </div>
-      )}
+
+        <div className="form-row">
+          <FormField id="input-contact-email" label="Email Address" required>
+            <input
+              type="email"
+              placeholder="e.g. contact@pacifictrade.com"
+              value={form.email}
+              onChange={(e) => updateField('email', e.target.value)}
+            />
+          </FormField>
+          <FormField id="input-contact-phone" label="Phone Number">
+            <input
+              type="text"
+              placeholder="e.g. +1 (555) 0199"
+              value={form.phone}
+              onChange={(e) => updateField('phone', e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="select-contact-country" label="Country">
+            <select
+              value={form.country}
+              onChange={(e) => updateField('country', e.target.value)}
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField id="select-contact-incoterms" label="Preferred Incoterms">
+            <select
+              value={form.tradeTerms}
+              onChange={(e) => updateField('tradeTerms', e.target.value)}
+            >
+              {INCOTERMS.map((term) => (
+                <option key={term} value={term}>{term}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="select-contact-type" label="Relationship Type">
+            <select
+              value={form.type}
+              onChange={(e) => updateField('type', e.target.value as ContactType)}
+            >
+              <option value="buyer">Buyer</option>
+              <option value="supplier">Supplier</option>
+              <option value="both">Both (Partner)</option>
+            </select>
+          </FormField>
+          <FormField id="select-contact-status" label="Status">
+            <select
+              value={form.status}
+              onChange={(e) => updateField('status', e.target.value as ContactStatus)}
+            >
+              <option value="active">Active</option>
+              <option value="prospect">Prospect</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </FormField>
+        </div>
+
+        <FormField id="input-contact-address" label="Address">
+          <input
+            type="text"
+            placeholder="Street, City, State, ZIP"
+            value={form.address}
+            onChange={(e) => updateField('address', e.target.value)}
+          />
+        </FormField>
+
+        <FormField id="textarea-contact-notes" label="Notes / Special Agreements">
+          <textarea
+            placeholder="Notes on communication style, trade history, specific requirements..."
+            value={form.notes}
+            onChange={(e) => updateField('notes', e.target.value)}
+          />
+        </FormField>
+      </Modal>
     </div>
   );
 }

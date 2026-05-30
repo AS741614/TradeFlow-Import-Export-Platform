@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { formatCurrency } from '@/lib/utils';
+import { FormField } from '@/components/ui/FormField';
 
 // ---- Calculator modes ----
 type CalcMode = 'margin-to-price' | 'price-to-margin';
@@ -104,10 +105,7 @@ export default function MarginsPage() {
         <div className="card">
           {mode === 'margin-to-price' ? (
             <>
-              <div className="form-group">
-                <label className="form-label" htmlFor="calc-cost-a">
-                  Unit Cost ($)
-                </label>
+              <FormField id="calc-cost-a" label="Unit Cost ($)">
                 <input
                   id="calc-cost-a"
                   type="number"
@@ -118,11 +116,8 @@ export default function MarginsPage() {
                   value={costA}
                   onChange={(e) => setCostA(e.target.value)}
                 />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="calc-margin-pct">
-                  Desired Margin (%)
-                </label>
+              </FormField>
+              <FormField id="calc-margin-pct" label="Desired Margin (%)">
                 <input
                   id="calc-margin-pct"
                   type="number"
@@ -134,14 +129,11 @@ export default function MarginsPage() {
                   value={marginPct}
                   onChange={(e) => setMarginPct(e.target.value)}
                 />
-              </div>
+              </FormField>
             </>
           ) : (
             <>
-              <div className="form-group">
-                <label className="form-label" htmlFor="calc-cost-b">
-                  Unit Cost ($)
-                </label>
+              <FormField id="calc-cost-b" label="Unit Cost ($)">
                 <input
                   id="calc-cost-b"
                   type="number"
@@ -152,11 +144,8 @@ export default function MarginsPage() {
                   value={costB}
                   onChange={(e) => setCostB(e.target.value)}
                 />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="calc-selling-price">
-                  Selling Price ($)
-                </label>
+              </FormField>
+              <FormField id="calc-selling-price" label="Selling Price ($)">
                 <input
                   id="calc-selling-price"
                   type="number"
@@ -167,7 +156,7 @@ export default function MarginsPage() {
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value)}
                 />
-              </div>
+              </FormField>
             </>
           )}
         </div>
@@ -261,10 +250,7 @@ export default function MarginsPage() {
           Landed Cost Calculator
         </h3>
         <div className="form-row">
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-purchase-cost">
-              Purchase Cost ($)
-            </label>
+          <FormField id="landed-purchase-cost" label="Purchase Cost ($)">
             <input
               id="landed-purchase-cost"
               type="number"
@@ -275,11 +261,8 @@ export default function MarginsPage() {
               value={purchaseCost}
               onChange={(e) => setPurchaseCost(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-freight">
-              Freight ($)
-            </label>
+          </FormField>
+          <FormField id="landed-freight" label="Freight ($)">
             <input
               id="landed-freight"
               type="number"
@@ -290,11 +273,8 @@ export default function MarginsPage() {
               value={freight}
               onChange={(e) => setFreight(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-insurance">
-              Insurance ($)
-            </label>
+          </FormField>
+          <FormField id="landed-insurance" label="Insurance ($)">
             <input
               id="landed-insurance"
               type="number"
@@ -305,13 +285,10 @@ export default function MarginsPage() {
               value={insurance}
               onChange={(e) => setInsurance(e.target.value)}
             />
-          </div>
+          </FormField>
         </div>
         <div className="form-row">
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-customs-duty">
-              Customs Duty (%)
-            </label>
+          <FormField id="landed-customs-duty" label="Customs Duty (%)">
             <input
               id="landed-customs-duty"
               type="number"
@@ -322,11 +299,8 @@ export default function MarginsPage() {
               value={customsDutyPct}
               onChange={(e) => setCustomsDutyPct(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-tax">
-              Tax (%)
-            </label>
+          </FormField>
+          <FormField id="landed-tax" label="Tax (%)">
             <input
               id="landed-tax"
               type="number"
@@ -337,11 +311,8 @@ export default function MarginsPage() {
               value={taxPct}
               onChange={(e) => setTaxPct(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="landed-other">
-              Other Costs ($)
-            </label>
+          </FormField>
+          <FormField id="landed-other" label="Other Costs ($)">
             <input
               id="landed-other"
               type="number"
@@ -352,7 +323,7 @@ export default function MarginsPage() {
               value={otherCosts}
               onChange={(e) => setOtherCosts(e.target.value)}
             />
-          </div>
+          </FormField>
         </div>
 
         {/* Landed Cost Breakdown */}

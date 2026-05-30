@@ -8,6 +8,9 @@ import type { Shipment, ShipmentStatus, Product, ShipmentProduct } from '@/lib/t
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const STATUS_FLOW: ShipmentStatus[] = ['ordered', 'shipped', 'in-transit', 'customs', 'delivered'];
 
@@ -190,6 +193,32 @@ export default function ShipmentsPage() {
 
 
 
+  const cargoColumns: Column<ShipmentProduct>[] = [
+    {
+      key: 'productName',
+      header: 'Product',
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      render: (p) => p.quantity.toLocaleString(),
+    },
+    {
+      key: 'actions',
+      header: 'Action',
+      render: (p) => (
+        <button
+          id={`btn-remove-cargo-${p.productId}`}
+          className="btn btn-ghost btn-sm btn-icon"
+          type="button"
+          onClick={() => removeProductFromShipment(p.productId)}
+        >
+          ✕
+        </button>
+      ),
+    },
+  ];
+
   if (loading) return <Loading />;
 
   return (
@@ -333,212 +362,162 @@ export default function ShipmentsPage() {
       </div>
 
       {/* Add / Edit Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Shipment' : 'New Shipment'}</h2>
-              <button id="btn-close-shipment-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-shipment-ref">Reference Code *</label>
-                  <input
-                    id="input-shipment-ref"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. SH-2026-001"
-                    value={form.reference}
-                    onChange={(e) => updateField('reference', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-shipment-status">Status</label>
-                  <select
-                    id="select-shipment-status"
-                    className="form-select"
-                    value={form.status}
-                    onChange={(e) => updateField('status', e.target.value as ShipmentStatus)}
-                  >
-                    {STATUS_FLOW.map((st) => (
-                      <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-shipment-origin">Origin Country</label>
-                  <select
-                    id="select-shipment-origin"
-                    className="form-select"
-                    value={form.origin}
-                    onChange={(e) => updateField('origin', e.target.value)}
-                  >
-                    {COUNTRIES.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-shipment-dest">Destination Country</label>
-                  <select
-                    id="select-shipment-dest"
-                    className="form-select"
-                    value={form.destination}
-                    onChange={(e) => updateField('destination', e.target.value)}
-                  >
-                    {COUNTRIES.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-shipment-carrier">Carrier</label>
-                  <select
-                    id="select-shipment-carrier"
-                    className="form-select"
-                    value={form.carrier}
-                    onChange={(e) => updateField('carrier', e.target.value)}
-                  >
-                    {CARRIERS.map((car) => (
-                      <option key={car} value={car}>{car}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-shipment-tracking">Tracking Number</label>
-                  <input
-                    id="input-shipment-tracking"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. MSK987654321"
-                    value={form.trackingNumber}
-                    onChange={(e) => updateField('trackingNumber', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-shipment-eta">Estimated Arrival Date *</label>
-                  <input
-                    id="input-shipment-eta"
-                    className="form-input"
-                    type="date"
-                    value={form.estimatedArrival}
-                    onChange={(e) => updateField('estimatedArrival', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Product selector in shipment */}
-              <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
-                <h4 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }}>
-                  Cargo / Products in Shipment
-                </h4>
-                <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-                  <select
-                    id="select-shipment-product-add"
-                    className="form-select"
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    style={{ flex: 2 }}
-                  >
-                    <option value="">-- Select Product to Add --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-                    ))}
-                  </select>
-                  <input
-                    id="input-shipment-product-qty"
-                    className="form-input"
-                    type="number"
-                    min={1}
-                    value={selectedProductQty}
-                    onChange={(e) => setSelectedProductQty(parseInt(e.target.value) || 1)}
-                    style={{ flex: 1 }}
-                  />
-                  <button
-                    id="btn-add-cargo-product"
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={addProductToShipment}
-                    disabled={!selectedProductId}
-                  >
-                    Add
-                  </button>
-                </div>
-
-                {form.products.length > 0 ? (
-                  <table className="data-table" style={{ background: 'var(--bg-surface)' }}>
-                    <thead>
-                      <tr>
-                        <th>Product</th>
-                        <th>Qty</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.products.map((p) => (
-                        <tr key={p.productId}>
-                          <td>{p.productName}</td>
-                          <td>{p.quantity.toLocaleString()}</td>
-                          <td>
-                            <button
-                              id={`btn-remove-cargo-${p.productId}`}
-                              className="btn btn-ghost btn-sm btn-icon"
-                              type="button"
-                              onClick={() => removeProductFromShipment(p.productId)}
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-                    No cargo added to this shipment yet.
-                  </p>
-                )}
-              </div>
-
-              <div className="form-group" style={{ marginTop: 'var(--space-md)' }}>
-                <label className="form-label" htmlFor="textarea-shipment-notes">Notes</label>
-                <textarea
-                  id="textarea-shipment-notes"
-                  className="form-textarea"
-                  placeholder="Port notes, customs remarks, special handling instructions..."
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-shipment" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-shipment"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.reference.trim() || !form.estimatedArrival}
-              >
-                {editingId ? 'Update Shipment' : 'Create Shipment'}
-              </button>
-            </div>
-          </div>
+      <Modal
+        id="shipment-modal"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Shipment' : 'New Shipment'}
+        footer={
+          <>
+            <button id="btn-cancel-shipment" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-shipment"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.reference.trim() || !form.estimatedArrival}
+            >
+              {editingId ? 'Update Shipment' : 'Create Shipment'}
+            </button>
+          </>
+        }
+      >
+        <div className="form-row">
+          <FormField id="input-shipment-ref" label="Reference Code" required>
+            <input
+              type="text"
+              placeholder="e.g. SH-2026-001"
+              value={form.reference}
+              onChange={(e) => updateField('reference', e.target.value)}
+            />
+          </FormField>
+          <FormField id="select-shipment-status" label="Status">
+            <select
+              value={form.status}
+              onChange={(e) => updateField('status', e.target.value as ShipmentStatus)}
+            >
+              {STATUS_FLOW.map((st) => (
+                <option key={st} value={st}>{st.charAt(0).toUpperCase() + st.slice(1)}</option>
+              ))}
+            </select>
+          </FormField>
         </div>
-      )}
+
+        <div className="form-row">
+          <FormField id="select-shipment-origin" label="Origin Country">
+            <select
+              value={form.origin}
+              onChange={(e) => updateField('origin', e.target.value)}
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField id="select-shipment-dest" label="Destination Country">
+            <select
+              value={form.destination}
+              onChange={(e) => updateField('destination', e.target.value)}
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="select-shipment-carrier" label="Carrier">
+            <select
+              value={form.carrier}
+              onChange={(e) => updateField('carrier', e.target.value)}
+            >
+              {CARRIERS.map((car) => (
+                <option key={car} value={car}>{car}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField id="input-shipment-tracking" label="Tracking Number">
+            <input
+              type="text"
+              placeholder="e.g. MSK987654321"
+              value={form.trackingNumber}
+              onChange={(e) => updateField('trackingNumber', e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="input-shipment-eta" label="Estimated Arrival Date" required>
+            <input
+              type="date"
+              value={form.estimatedArrival}
+              onChange={(e) => updateField('estimatedArrival', e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        {/* Product selector in shipment */}
+        <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
+          <h4 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }}>
+            Cargo / Products in Shipment
+          </h4>
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
+            <select
+              id="select-shipment-product-add"
+              className="form-select"
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              style={{ flex: 2 }}
+            >
+              <option value="">-- Select Product to Add --</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
+              ))}
+            </select>
+            <input
+              id="input-shipment-product-qty"
+              className="form-input"
+              type="number"
+              min={1}
+              value={selectedProductQty}
+              onChange={(e) => setSelectedProductQty(parseInt(e.target.value) || 1)}
+              style={{ flex: 1 }}
+            />
+            <button
+              id="btn-add-cargo-product"
+              className="btn btn-secondary"
+              type="button"
+              onClick={addProductToShipment}
+              disabled={!selectedProductId}
+            >
+              Add
+            </button>
+          </div>
+
+          {form.products.length > 0 ? (
+            <div style={{ background: 'var(--bg-surface)' }}>
+              <DataTable
+                id="shipment-cargo-table"
+                columns={cargoColumns}
+                data={form.products}
+                keyExtractor={(item) => item.productId}
+              />
+            </div>
+          ) : (
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+              No cargo added to this shipment yet.
+            </p>
+          )}
+        </div>
+
+        <FormField id="textarea-shipment-notes" label="Notes">
+          <textarea
+            placeholder="Port notes, customs remarks, special handling instructions..."
+            value={form.notes}
+            onChange={(e) => updateField('notes', e.target.value)}
+          />
+        </FormField>
+      </Modal>
     </div>
   );
 }

@@ -9,6 +9,10 @@ import type { OutreachContact } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
+import { DataTable } from '@/components/ui/DataTable';
+import { TableActions } from '@/components/ui/TableActions';
 
 const EMPTY_MANUAL_FORM = {
   firstName: '',
@@ -396,13 +400,19 @@ export default function OutreachContactsPage() {
                 </select>
               </div>
 
-              {selectedIds.length > 0 && (
-                <button id="btn-bulk-delete-contacts" className="btn btn-danger" onClick={() => { void handleBulkDelete(); }}>
-                  🗑️ Delete Selected ({String(selectedIds.length)})
-                </button>
-              )}
+              {/* Bulk delete action button moved to TableActions wrapper below */}
             </div>
           </div>
+
+          <TableActions
+            id="table-actions-outreach"
+            selectedCount={selectedIds.length}
+            onClearSelection={() => setSelectedIds([])}
+          >
+            <button id="btn-bulk-delete-contacts" className="btn btn-danger" onClick={() => { void handleBulkDelete(); }}>
+              🗑️ Delete Selected
+            </button>
+          </TableActions>
 
           {/* Directory Table */}
           <div className="data-table-wrapper">
@@ -410,185 +420,154 @@ export default function OutreachContactsPage() {
               <h3>{String(filtered.length)} Registered Outreach Contact{filtered.length !== 1 ? 's' : ''}</h3>
             </div>
 
-            {filtered.length > 0 ? (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: 40 }}>
-                      <input
-                        id="checkbox-select-all"
-                        type="checkbox"
-                        checked={filtered.length > 0 && selectedIds.length === filtered.length}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                      />
-                    </th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Company</th>
-                    <th>Country</th>
-                    <th>Source</th>
-                    <th>Tags</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((c) => (
-                    <tr key={c.id} className="stagger-item">
-                      <td>
-                        <input
-                          id={`checkbox-select-${c.id}`}
-                          type="checkbox"
-                          checked={selectedIds.includes(c.id)}
-                          onChange={(e) => handleSelectOne(c.id, e.target.checked)}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{c.firstName} {c.lastName}</td>
-                      <td>{c.email}</td>
-                      <td>{c.company}</td>
-                      <td>{c.country}</td>
-                      <td>
-                        <span style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase' }}>
-                          {c.source}
+            <DataTable
+              id="table-outreach-contacts"
+              columns={[
+                {
+                  key: 'name',
+                  header: 'Name',
+                  render: (c) => `${c.firstName} ${c.lastName}`,
+                },
+                {
+                  key: 'email',
+                  header: 'Email',
+                },
+                {
+                  key: 'company',
+                  header: 'Company',
+                },
+                {
+                  key: 'country',
+                  header: 'Country',
+                },
+                {
+                  key: 'source',
+                  header: 'Source',
+                  render: (c) => (
+                    <span style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'uppercase' }}>
+                      {c.source}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'tags',
+                  header: 'Tags',
+                  render: (c) => (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      {c.tags.map((t, idx) => (
+                        <span key={idx} className="tag tag-blue">
+                          {t}
                         </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                          {c.tags.map((t, idx) => (
-                            <span key={idx} className="tag tag-blue">
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="data-table-empty">
-                <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-                <p>No outreach contacts in database. Import files or add manually to trigger campaigns.</p>
-              </div>
-            )}
+                      ))}
+                    </div>
+                  ),
+                },
+              ]}
+              data={filtered}
+              keyExtractor={(c) => c.id}
+              selectedIds={selectedIds}
+              onSelectChange={handleSelectOne}
+              onSelectAllChange={handleSelectAll}
+              emptyState={
+                <div className="data-table-empty">
+                  <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                  <p>No outreach contacts in database. Import files or add manually to trigger campaigns.</p>
+                </div>
+              }
+            />
           </div>
         </>
       )}
 
       {/* Manual Contact Modal */}
-      {showManualModal && (
-        <div className="modal-overlay" onClick={() => setShowManualModal(false)}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add Outreach Contact</h2>
-              <button id="btn-close-manual-modal" className="btn btn-ghost btn-icon btn-sm" onClick={() => setShowManualModal(false)}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-manual-first">First Name *</label>
-                  <input
-                    id="input-manual-first"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Jean"
-                    value={manualForm.firstName}
-                    onChange={(e) => setManualForm({ ...manualForm, firstName: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-manual-last">Last Name</label>
-                  <input
-                    id="input-manual-last"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Dupont"
-                    value={manualForm.lastName}
-                    onChange={(e) => setManualForm({ ...manualForm, lastName: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-manual-email">Email Address *</label>
-                  <input
-                    id="input-manual-email"
-                    className="form-input"
-                    type="email"
-                    placeholder="e.g. j.dupont@company.com"
-                    value={manualForm.email}
-                    onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-manual-company">Company Name *</label>
-                  <input
-                    id="input-manual-company"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Global Distributing SA"
-                    value={manualForm.company}
-                    onChange={(e) => setManualForm({ ...manualForm, company: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-manual-country">Country</label>
-                  <select
-                    id="select-manual-country"
-                    className="form-select"
-                    value={manualForm.country}
-                    onChange={(e) => setManualForm({ ...manualForm, country: e.target.value })}
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-manual-tags">Tags (Comma-separated)</label>
-                  <input
-                    id="input-manual-tags"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. buyer, wholesale, priority"
-                    value={manualForm.tags}
-                    onChange={(e) => setManualForm({ ...manualForm, tags: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="input-manual-phone">Phone Number</label>
-                <input
-                  id="input-manual-phone"
-                  className="form-input"
-                  type="text"
-                  placeholder="e.g. +33-1-2345678"
-                  value={manualForm.phone}
-                  onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-manual" className="btn btn-secondary" onClick={() => setShowManualModal(false)}>Cancel</button>
-              <button
-                id="btn-save-manual"
-                className="btn btn-primary"
-                onClick={() => { void handleAddManual(); }}
-                disabled={!manualForm.email.trim() || !manualForm.firstName.trim() || !manualForm.company.trim()}
-              >
-                Save Contact
-              </button>
-            </div>
-          </div>
+      <Modal
+        id="modal-manual-contact"
+        isOpen={showManualModal}
+        onClose={() => setShowManualModal(false)}
+        title="Add Outreach Contact"
+        footer={
+          <>
+            <button id="btn-cancel-manual" className="btn btn-secondary" onClick={() => setShowManualModal(false)}>Cancel</button>
+            <button
+              id="btn-save-manual"
+              className="btn btn-primary"
+              onClick={() => { void handleAddManual(); }}
+              disabled={!manualForm.email.trim() || !manualForm.firstName.trim() || !manualForm.company.trim()}
+            >
+              Save Contact
+            </button>
+          </>
+        }
+        className="modal-lg"
+      >
+        <div className="form-row">
+          <FormField id="input-manual-first" label="First Name" required>
+            <input
+              type="text"
+              placeholder="e.g. Jean"
+              value={manualForm.firstName}
+              onChange={(e) => setManualForm({ ...manualForm, firstName: e.target.value })}
+            />
+          </FormField>
+          <FormField id="input-manual-last" label="Last Name">
+            <input
+              type="text"
+              placeholder="e.g. Dupont"
+              value={manualForm.lastName}
+              onChange={(e) => setManualForm({ ...manualForm, lastName: e.target.value })}
+            />
+          </FormField>
         </div>
-      )}
+
+        <div className="form-row">
+          <FormField id="input-manual-email" label="Email Address" required>
+            <input
+              type="email"
+              placeholder="e.g. j.dupont@company.com"
+              value={manualForm.email}
+              onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })}
+            />
+          </FormField>
+          <FormField id="input-manual-company" label="Company Name" required>
+            <input
+              type="text"
+              placeholder="e.g. Global Distributing SA"
+              value={manualForm.company}
+              onChange={(e) => setManualForm({ ...manualForm, company: e.target.value })}
+            />
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="select-manual-country" label="Country">
+            <select
+              value={manualForm.country}
+              onChange={(e) => setManualForm({ ...manualForm, country: e.target.value })}
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField id="input-manual-tags" label="Tags (Comma-separated)">
+            <input
+              type="text"
+              placeholder="e.g. buyer, wholesale, priority"
+              value={manualForm.tags}
+              onChange={(e) => setManualForm({ ...manualForm, tags: e.target.value })}
+            />
+          </FormField>
+        </div>
+
+        <FormField id="input-manual-phone" label="Phone Number">
+          <input
+            type="text"
+            placeholder="e.g. +33-1-2345678"
+            value={manualForm.phone}
+            onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })}
+          />
+        </FormField>
+      </Modal>
     </div>
   );
 }

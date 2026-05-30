@@ -7,6 +7,9 @@ import type { ComplianceItem, Shipment } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const EMPTY_FORM = {
   shipmentId: '',
@@ -182,12 +185,79 @@ export default function CompliancePage() {
     return sh ? `Shipment: ${sh.reference}` : 'General Compliance';
   };
 
+  const columns: Column<ComplianceItem>[] = [
+    {
+      key: 'documentName',
+      header: 'Document Name',
+      render: (item) => (
+        <>
+          <div style={{ fontWeight: 'var(--font-weight-medium)' }}>{item.documentName}</div>
+          {item.notes && (
+            <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              {item.notes}
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'documentType',
+      header: 'Type',
+      render: (item) => (
+        <code style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'capitalize' }}>
+          {item.documentType.replace(/-/g, ' ')}
+        </code>
+      ),
+    },
+    {
+      key: 'shipmentId',
+      header: 'Linked Shipment / Scope',
+      render: (item) => getShipmentRef(item.shipmentId),
+    },
+    {
+      key: 'requiredBy',
+      header: 'Deadline',
+      render: (item) => formatDate(item.requiredBy),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (item) => (
+        <span className={`badge ${getStatusColor(item.status === 'approved' ? 'success' : item.status === 'submitted' ? 'info' : item.status === 'rejected' ? 'danger' : 'warning')}`}>
+          {item.status}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (item) => (
+        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+          <button
+            id={`btn-edit-compliance-${item.id}`}
+            className="btn btn-ghost btn-sm btn-icon"
+            onClick={() => openEdit(item)}
+            title="Edit / Update Status"
+          >
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+          <button
+            id={`btn-delete-compliance-${item.id}`}
+            className="btn btn-danger btn-sm btn-icon"
+            onClick={() => { void handleDelete(item.id); }}
+            title="Delete"
+          >
+            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   const filtered = complianceItems.filter((item) => {
     if (statusFilter === 'all') return true;
     return item.status === statusFilter;
   });
-
-
 
   if (loading) return <Loading />;
 
@@ -254,179 +324,103 @@ export default function CompliancePage() {
       </div>
 
       {/* Compliance Table */}
-      <div className="data-table-wrapper">
-        {filtered.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Document Name</th>
-                <th>Type</th>
-                <th>Linked Shipment / Scope</th>
-                <th>Deadline</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item) => (
-                <tr key={item.id} className="stagger-item">
-                  <td>
-                    <div style={{ fontWeight: 'var(--font-weight-medium)' }}>{item.documentName}</div>
-                    {item.notes && <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: '2px' }}>{item.notes}</div>}
-                  </td>
-                  <td>
-                    <code style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)', textTransform: 'capitalize' }}>
-                      {item.documentType.replace(/-/g, ' ')}
-                    </code>
-                  </td>
-                  <td>{getShipmentRef(item.shipmentId)}</td>
-                  <td>{formatDate(item.requiredBy)}</td>
-                  <td>
-                    <span className={`badge ${getStatusColor(item.status === 'approved' ? 'success' : item.status === 'submitted' ? 'info' : item.status === 'rejected' ? 'danger' : 'warning')}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                      <button
-                        id={`btn-edit-compliance-${item.id}`}
-                        className="btn btn-ghost btn-sm btn-icon"
-                        onClick={() => openEdit(item)}
-                        title="Edit / Update Status"
-                      >
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      </button>
-                      <button
-                        id={`btn-delete-compliance-${item.id}`}
-                        className="btn btn-danger btn-sm btn-icon"
-                        onClick={() => { void handleDelete(item.id); }}
-                        title="Delete"
-                      >
-                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
+      <DataTable
+        id="compliance-table"
+        columns={columns}
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        emptyState={
           <div className="data-table-empty">
             <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <p>No compliance records found for this filter category.</p>
           </div>
-        )}
-      </div>
+        }
+      />
 
       {/* Add / Edit Compliance Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Compliance Item' : 'Add Compliance Item'}</h2>
-              <button id="btn-close-compliance-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
+      <Modal
+        id="compliance-modal"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Compliance Item' : 'Add Compliance Item'}
+        footer={
+          <>
+            <button id="btn-cancel-compliance" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-compliance"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.documentName.trim() || !form.requiredBy}
+            >
+              {editingId ? 'Save Changes' : 'Add Item'}
+            </button>
+          </>
+        }
+      >
+        <FormField id="input-compliance-name" label="Document Name" required>
+          <input
+            type="text"
+            placeholder="e.g. Certificate of Origin (Chamber of Commerce)"
+            value={form.documentName}
+            onChange={(e) => updateField('documentName', e.target.value)}
+          />
+        </FormField>
 
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label" htmlFor="input-compliance-name">Document Name *</label>
-                <input
-                  id="input-compliance-name"
-                  className="form-input"
-                  type="text"
-                  placeholder="e.g. Certificate of Origin (Chamber of Commerce)"
-                  value={form.documentName}
-                  onChange={(e) => updateField('documentName', e.target.value)}
-                />
-              </div>
+        <div className="form-row">
+          <FormField id="select-compliance-type" label="Document Category">
+            <select
+              value={form.documentType}
+              onChange={(e) => updateField('documentType', e.target.value)}
+            >
+              {COMPLIANCE_DOC_TYPES.map((dt) => (
+                <option key={dt.code} value={dt.code}>{dt.name}</option>
+              ))}
+            </select>
+          </FormField>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-compliance-type">Document Category</label>
-                  <select
-                    id="select-compliance-type"
-                    className="form-select"
-                    value={form.documentType}
-                    onChange={(e) => updateField('documentType', e.target.value)}
-                  >
-                    {COMPLIANCE_DOC_TYPES.map((dt) => (
-                      <option key={dt.code} value={dt.code}>{dt.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-compliance-shipment">Associate with Shipment</label>
-                  <select
-                    id="select-compliance-shipment"
-                    className="form-select"
-                    value={form.shipmentId}
-                    onChange={(e) => updateField('shipmentId', e.target.value)}
-                  >
-                    <option value="">General Compliance (Not shipment specific)</option>
-                    {shipments.map((s) => (
-                      <option key={s.id} value={s.id}>Ref: {s.reference} ({s.origin} → {s.destination})</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-compliance-deadline">Deadline / Required By *</label>
-                  <input
-                    id="input-compliance-deadline"
-                    className="form-input"
-                    type="date"
-                    value={form.requiredBy}
-                    onChange={(e) => updateField('requiredBy', e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-compliance-status">Verification Status</label>
-                  <select
-                    id="select-compliance-status"
-                    className="form-select"
-                    value={form.status}
-                    onChange={(e) => updateField('status', e.target.value as 'pending' | 'submitted' | 'approved' | 'rejected')}
-                  >
-                    <option value="pending">Pending Documents</option>
-                    <option value="submitted">Submitted (Under Review)</option>
-                    <option value="approved">Approved & Cleared</option>
-                    <option value="rejected">Rejected (Needs Revision)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="textarea-compliance-notes">Compliance Notes</label>
-                <textarea
-                  id="textarea-compliance-notes"
-                  className="form-textarea"
-                  placeholder="Additional directives, correction requests, contact info for the certifying authority..."
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-compliance" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-compliance"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.documentName.trim() || !form.requiredBy}
-              >
-                {editingId ? 'Save Changes' : 'Add Item'}
-              </button>
-            </div>
-          </div>
+          <FormField id="select-compliance-shipment" label="Associate with Shipment">
+            <select
+              value={form.shipmentId}
+              onChange={(e) => updateField('shipmentId', e.target.value)}
+            >
+              <option value="">General Compliance (Not shipment specific)</option>
+              {shipments.map((s) => (
+                <option key={s.id} value={s.id}>Ref: {s.reference} ({s.origin} → {s.destination})</option>
+              ))}
+            </select>
+          </FormField>
         </div>
-      )}
+
+        <div className="form-row">
+          <FormField id="input-compliance-deadline" label="Deadline / Required By" required>
+            <input
+              type="date"
+              value={form.requiredBy}
+              onChange={(e) => updateField('requiredBy', e.target.value)}
+            />
+          </FormField>
+
+          <FormField id="select-compliance-status" label="Verification Status">
+            <select
+              value={form.status}
+              onChange={(e) => updateField('status', e.target.value as 'pending' | 'submitted' | 'approved' | 'rejected')}
+            >
+              <option value="pending">Pending Documents</option>
+              <option value="submitted">Submitted (Under Review)</option>
+              <option value="approved">Approved & Cleared</option>
+              <option value="rejected">Rejected (Needs Revision)</option>
+            </select>
+          </FormField>
+        </div>
+
+        <FormField id="textarea-compliance-notes" label="Compliance Notes">
+          <textarea
+            placeholder="Additional directives, correction requests, contact info for the certifying authority..."
+            value={form.notes}
+            onChange={(e) => updateField('notes', e.target.value)}
+          />
+        </FormField>
+      </Modal>
     </div>
   );
 }

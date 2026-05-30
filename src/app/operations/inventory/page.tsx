@@ -8,6 +8,9 @@ import type { Product } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 // ---- Helpers ----
 
@@ -149,6 +152,74 @@ export default function InventoryPage() {
     []
   );
 
+  const columns: Column<Product>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      cellClassName: 'font-semibold',
+    },
+    {
+      key: 'sku',
+      header: 'SKU',
+      render: (product) => (
+        <code style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>
+          {product.sku}
+        </code>
+      ),
+    },
+    {
+      key: 'hsCode',
+      header: 'HS Code',
+    },
+    {
+      key: 'category',
+      header: 'Category',
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      render: (product) => product.quantity.toLocaleString(),
+    },
+    {
+      key: 'unitCost',
+      header: 'Unit Cost',
+      render: (product) => formatCurrency(product.unitCost, product.currency),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (product) => (
+        <span className={`badge ${getStatusColor(product.status)}`}>
+          {product.status}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (product) => (
+        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+          <button
+            id={`btn-edit-product-${product.id}`}
+            className="btn btn-ghost btn-sm btn-icon"
+            onClick={() => openEdit(product)}
+            title="Edit"
+          >
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+          <button
+            id={`btn-delete-product-${product.id}`}
+            className="btn btn-danger btn-sm btn-icon"
+            onClick={() => { void handleDelete(product.id); }}
+            title="Delete"
+          >
+            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
@@ -169,242 +240,159 @@ export default function InventoryPage() {
         <Loading />
       ) : (
         /* Data Table */
-      <div className="data-table-wrapper">
-        <div className="data-table-header">
-          <h3>{filtered.length} Product{filtered.length !== 1 ? 's' : ''}</h3>
-          <div className="data-table-actions">
-            <input
-              id="input-inventory-search"
-              className="form-input"
-              type="text"
-              placeholder="Search products..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: 260, height: 36 }}
-            />
+        <div className="data-table-wrapper">
+          <div className="data-table-header">
+            <h3>{filtered.length} Product{filtered.length !== 1 ? 's' : ''}</h3>
+            <div className="data-table-actions">
+              <input
+                id="input-inventory-search"
+                className="form-input"
+                type="text"
+                placeholder="Search products..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: 260, height: 36 }}
+              />
+            </div>
           </div>
-        </div>
 
-        {filtered.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>SKU</th>
-                <th>HS Code</th>
-                <th>Category</th>
-                <th>Qty</th>
-                <th>Unit Cost</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((product) => (
-                <tr key={product.id} className="stagger-item">
-                  <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{product.name}</td>
-                  <td><code style={{ fontSize: 'var(--font-size-xs)', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{product.sku}</code></td>
-                  <td>{product.hsCode}</td>
-                  <td>{product.category}</td>
-                  <td>{product.quantity.toLocaleString()}</td>
-                  <td>{formatCurrency(product.unitCost, product.currency)}</td>
-                  <td>
-                    <span className={`badge ${getStatusColor(product.status)}`}>
-                      {product.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                      <button
-                        id={`btn-edit-product-${product.id}`}
-                        className="btn btn-ghost btn-sm btn-icon"
-                        onClick={() => openEdit(product)}
-                        title="Edit"
-                      >
-                        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                      </button>
-                      <button
-                        id={`btn-delete-product-${product.id}`}
-                        className="btn btn-danger btn-sm btn-icon"
-                        onClick={() => { void handleDelete(product.id); }}
-                        title="Delete"
-                      >
-                        <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="data-table-empty">
-            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>
-            <p>No products found. Add your first product to get started.</p>
-          </div>
-        )}
-      </div>
+          <DataTable
+            id="inventory-table"
+            columns={columns}
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            emptyState={
+              <div className="data-table-empty">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>
+                <p>No products found. Add your first product to get started.</p>
+              </div>
+            }
+          />
+        </div>
       )}
 
       {/* Add / Edit Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Product' : 'Add Product'}</h2>
-              <button id="btn-close-product-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-name">Product Name *</label>
-                  <input
-                    id="input-product-name"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Organic Cotton Fabric"
-                    value={form.name}
-                    onChange={(e) => updateField('name', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-sku">SKU *</label>
-                  <input
-                    id="input-product-sku"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. TEX-001"
-                    value={form.sku}
-                    onChange={(e) => updateField('sku', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-hsCode">HS Code</label>
-                  <input
-                    id="input-product-hsCode"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. 5208.12"
-                    value={form.hsCode}
-                    onChange={(e) => updateField('hsCode', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-product-category">Category</label>
-                  <select
-                    id="select-product-category"
-                    className="form-select"
-                    value={form.category}
-                    onChange={(e) => updateField('category', e.target.value)}
-                  >
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-quantity">Quantity</label>
-                  <input
-                    id="input-product-quantity"
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    value={form.quantity}
-                    onChange={(e) => updateField('quantity', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-reorderLevel">Reorder Level</label>
-                  <input
-                    id="input-product-reorderLevel"
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    value={form.reorderLevel}
-                    onChange={(e) => updateField('reorderLevel', parseInt(e.target.value) || 0)}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-unitCost">Unit Cost</label>
-                  <input
-                    id="input-product-unitCost"
-                    className="form-input"
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={form.unitCost}
-                    onChange={(e) => updateField('unitCost', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-product-currency">Currency</label>
-                  <select
-                    id="select-product-currency"
-                    className="form-select"
-                    value={form.currency}
-                    onChange={(e) => updateField('currency', e.target.value)}
-                  >
-                    {CURRENCIES.map((cur) => (
-                      <option key={cur.code} value={cur.code}>{cur.code} — {cur.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-product-supplier">Supplier</label>
-                  <input
-                    id="input-product-supplier"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Mumbai Textiles Co."
-                    value={form.supplier}
-                    onChange={(e) => updateField('supplier', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-product-origin">Origin Country</label>
-                  <select
-                    id="select-product-origin"
-                    className="form-select"
-                    value={form.origin}
-                    onChange={(e) => updateField('origin', e.target.value)}
-                  >
-                    {COUNTRIES.map((country) => (
-                      <option key={country} value={country}>{country}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-product" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-product"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.name.trim() || !form.sku.trim()}
-              >
-                {editingId ? 'Update Product' : 'Add Product'}
-              </button>
-            </div>
-          </div>
+      <Modal
+        id="product-modal"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Product' : 'Add Product'}
+        footer={
+          <>
+            <button id="btn-cancel-product" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-product"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.name.trim() || !form.sku.trim()}
+            >
+              {editingId ? 'Update Product' : 'Add Product'}
+            </button>
+          </>
+        }
+      >
+        <div className="form-row">
+          <FormField id="input-product-name" label="Product Name" required>
+            <input
+              type="text"
+              placeholder="e.g. Organic Cotton Fabric"
+              value={form.name}
+              onChange={(e) => updateField('name', e.target.value)}
+            />
+          </FormField>
+          <FormField id="input-product-sku" label="SKU" required>
+            <input
+              type="text"
+              placeholder="e.g. TEX-001"
+              value={form.sku}
+              onChange={(e) => updateField('sku', e.target.value)}
+            />
+          </FormField>
         </div>
-      )}
+
+        <div className="form-row">
+          <FormField id="input-product-hsCode" label="HS Code">
+            <input
+              type="text"
+              placeholder="e.g. 5208.12"
+              value={form.hsCode}
+              onChange={(e) => updateField('hsCode', e.target.value)}
+            />
+          </FormField>
+          <FormField id="select-product-category" label="Category">
+            <select
+              value={form.category}
+              onChange={(e) => updateField('category', e.target.value)}
+            >
+              {PRODUCT_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="input-product-quantity" label="Quantity">
+            <input
+              type="number"
+              min={0}
+              value={form.quantity}
+              onChange={(e) => updateField('quantity', parseInt(e.target.value) || 0)}
+            />
+          </FormField>
+          <FormField id="input-product-reorderLevel" label="Reorder Level">
+            <input
+              type="number"
+              min={0}
+              value={form.reorderLevel}
+              onChange={(e) => updateField('reorderLevel', parseInt(e.target.value) || 0)}
+            />
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="input-product-unitCost" label="Unit Cost">
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={form.unitCost}
+              onChange={(e) => updateField('unitCost', parseFloat(e.target.value) || 0)}
+            />
+          </FormField>
+          <FormField id="select-product-currency" label="Currency">
+            <select
+              value={form.currency}
+              onChange={(e) => updateField('currency', e.target.value)}
+            >
+              {CURRENCIES.map((cur) => (
+                <option key={cur.code} value={cur.code}>{cur.code} — {cur.name}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="input-product-supplier" label="Supplier">
+            <input
+              type="text"
+              placeholder="e.g. Mumbai Textiles Co."
+              value={form.supplier}
+              onChange={(e) => updateField('supplier', e.target.value)}
+            />
+          </FormField>
+          <FormField id="select-product-origin" label="Origin Country">
+            <select
+              value={form.origin}
+              onChange={(e) => updateField('origin', e.target.value)}
+            >
+              {COUNTRIES.map((country) => (
+                <option key={country} value={country}>{country}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      </Modal>
     </div>
   );
 }

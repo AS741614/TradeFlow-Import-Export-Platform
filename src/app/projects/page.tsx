@@ -8,6 +8,8 @@ import type { Task, TaskStatus, TaskPriority } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 // ---- Column configuration ----
 
@@ -403,157 +405,121 @@ export default function ProjectsPage() {
       )}
 
       {/* ---- Add Task Modal ---- */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add New Task</h2>
-              <button
-                id="close-task-modal-btn"
-                className="btn btn-ghost btn-icon btn-sm"
-                onClick={() => setShowModal(false)}
+      <Modal
+        id="task-modal"
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Add New Task"
+      >
+        <form onSubmit={(e) => { void handleAddTask(e); }}>
+          {/* Title */}
+          <FormField id="task-title" label="Title *">
+            <input
+              id="task-title"
+              className="form-input"
+              type="text"
+              placeholder="Enter task title"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              required
+            />
+          </FormField>
+
+          {/* Description */}
+          <FormField id="task-description" label="Description">
+            <textarea
+              id="task-description"
+              className="form-textarea"
+              placeholder="Add details about this task"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={3}
+            />
+          </FormField>
+
+          {/* Priority & Category row */}
+          <div className="form-row">
+            <FormField id="task-priority" label="Priority">
+              <select
+                id="task-priority"
+                className="form-select"
+                value={form.priority}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))
+                }
               >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={(e) => { void handleAddTask(e); }}>
-              <div className="modal-body">
-                {/* Title */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="task-title">
-                    Title *
-                  </label>
-                  <input
-                    id="task-title"
-                    className="form-input"
-                    type="text"
-                    placeholder="Enter task title"
-                    value={form.title}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="task-description">
-                    Description
-                  </label>
-                  <textarea
-                    id="task-description"
-                    className="form-textarea"
-                    placeholder="Add details about this task"
-                    value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-
-                {/* Priority & Category row */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="task-priority">
-                      Priority
-                    </label>
-                    <select
-                      id="task-priority"
-                      className="form-select"
-                      value={form.priority}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, priority: e.target.value as TaskPriority }))
-                      }
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="task-category">
-                      Category
-                    </label>
-                    <input
-                      id="task-category"
-                      className="form-input"
-                      type="text"
-                      placeholder="e.g. Operations, Marketing"
-                      value={form.category}
-                      onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                {/* Due Date & Assignee row */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="task-due-date">
-                      Due Date
-                    </label>
-                    <input
-                      id="task-due-date"
-                      className="form-input"
-                      type="date"
-                      value={form.dueDate}
-                      onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="task-assignee">
-                      Assignee
-                    </label>
-                    <input
-                      id="task-assignee"
-                      className="form-input"
-                      type="text"
-                      placeholder="Who is responsible?"
-                      value={form.assignee}
-                      onChange={(e) => setForm((f) => ({ ...f, assignee: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div className="form-group">
-                  <label className="form-label" htmlFor="task-tags">
-                    Tags (comma-separated)
-                  </label>
-                  <input
-                    id="task-tags"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. logistics, urgent, Q3"
-                    value={form.tags}
-                    onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  id="cancel-task-btn"
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </button>
-                <button id="submit-task-btn" type="submit" className="btn btn-primary">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Add Task
-                </button>
-              </div>
-            </form>
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </FormField>
+            <FormField id="task-category" label="Category">
+              <input
+                id="task-category"
+                className="form-input"
+                type="text"
+                placeholder="e.g. Operations, Marketing"
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+              />
+            </FormField>
           </div>
-        </div>
-      )}
+
+          {/* Due Date & Assignee row */}
+          <div className="form-row">
+            <FormField id="task-due-date" label="Due Date">
+              <input
+                id="task-due-date"
+                className="form-input"
+                type="date"
+                value={form.dueDate}
+                onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+              />
+            </FormField>
+            <FormField id="task-assignee" label="Assignee">
+              <input
+                id="task-assignee"
+                className="form-input"
+                type="text"
+                placeholder="Who is responsible?"
+                value={form.assignee}
+                onChange={(e) => setForm((f) => ({ ...f, assignee: e.target.value }))}
+              />
+            </FormField>
+          </div>
+
+          {/* Tags */}
+          <FormField id="task-tags" label="Tags (comma-separated)">
+            <input
+              id="task-tags"
+              className="form-input"
+              type="text"
+              placeholder="e.g. logistics, urgent, Q3"
+              value={form.tags}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+            />
+          </FormField>
+
+          <div className="form-group" style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-sm)', marginTop: 'var(--space-lg)' }}>
+            <button
+              id="cancel-task-btn"
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setShowModal(false)}
+            >
+              Cancel
+            </button>
+            <button id="submit-task-btn" type="submit" className="btn btn-primary">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Task
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

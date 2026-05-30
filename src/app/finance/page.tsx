@@ -8,6 +8,7 @@ import type { CostItem, FinancialProjection } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
 
 // ---- Aggregated finance metrics ----
 interface FinanceMetrics {
@@ -70,6 +71,31 @@ export default function FinanceOverviewPage() {
   const recentCostItems = costItems.slice(-8).reverse();
 
   if (loading) return <Loading />;
+
+  const columns: Column<CostItem>[] = [
+    {
+      key: 'description',
+      header: 'Description',
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (item) => <span className="badge status-info">{item.category}</span>,
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (item) => (
+        <span style={{ fontWeight: 'var(--font-weight-semibold)' }}>
+          {formatCurrency(item.amount, item.currency)}
+        </span>
+      ),
+    },
+    {
+      key: 'currency',
+      header: 'Currency',
+    },
+  ];
 
   return (
     <div className="animate-fade-in">
@@ -146,39 +172,20 @@ export default function FinanceOverviewPage() {
           <h3>Recent Cost Items</h3>
           <span className="text-sm text-secondary">{costItems.length} total</span>
         </div>
-        {recentCostItems.length > 0 ? (
-          <table className="data-table" id="finance-cost-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Amount</th>
-                <th>Currency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentCostItems.map((item) => (
-                <tr key={item.id} className="stagger-item">
-                  <td>{item.description}</td>
-                  <td>
-                    <span className="badge status-info">{item.category}</span>
-                  </td>
-                  <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>
-                    {formatCurrency(item.amount, item.currency)}
-                  </td>
-                  <td>{item.currency}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="data-table-empty">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-            </svg>
-            <p>No cost items recorded yet.</p>
-          </div>
-        )}
+        <DataTable
+          id="finance-cost-table"
+          columns={columns}
+          data={recentCostItems}
+          keyExtractor={(item) => item.id}
+          emptyState={
+            <div className="data-table-empty">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+              </svg>
+              <p>No cost items recorded yet.</p>
+            </div>
+          }
+        />
       </div>
 
       {/* Navigation Link Cards */}

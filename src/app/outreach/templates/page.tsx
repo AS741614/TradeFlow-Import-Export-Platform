@@ -9,6 +9,8 @@ import type { EmailTemplate, TemplateCategory } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const EMPTY_FORM = {
   name: '',
@@ -259,139 +261,120 @@ export default function OutreachTemplatesPage() {
       )}
 
       {/* Large Edit / Create Template Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Template' : 'Compose Email Template'}</h2>
-              <button id="btn-close-template-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+      <Modal
+        id="template-modal"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Template' : 'Compose Email Template'}
+        className="modal-xl"
+        footer={
+          <>
+            <button id="btn-cancel-template" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-template"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.name.trim() || !form.subject.trim() || !form.body.trim()}
+            >
+              {editingId ? 'Update Template' : 'Save Template'}
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-xl)' }}>
+          
+          {/* Left Column: Form Controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+            {!editingId && (
+              <FormField id="select-preset-loader" label="Load from System Presets">
+                <select
+                  onChange={(e) => handleLoadPreset(e.target.value)}
+                  defaultValue=""
+                >
+                  <option value="">-- Click to Load Preset --</option>
+                  {EMAIL_TEMPLATE_PRESETS.map((p, idx) => (
+                    <option key={idx} value={idx}>{p.name}</option>
+                  ))}
+                </select>
+              </FormField>
+            )}
+
+            <div className="form-row">
+              <FormField id="input-template-name" label="Template Name" required>
+                <input
+                  type="text"
+                  placeholder="e.g. Intro Pitch - Food Products"
+                  value={form.name}
+                  onChange={(e) => updateField('name', e.target.value)}
+                />
+              </FormField>
+              <FormField id="select-template-category" label="Category">
+                <select
+                  value={form.category}
+                  onChange={(e) => updateField('category', e.target.value as TemplateCategory)}
+                >
+                  <option value="introduction">Introduction / Cold Outreach</option>
+                  <option value="catalog">Product Catalog</option>
+                  <option value="quotation">Quotation / Follow Up</option>
+                  <option value="follow-up">Follow Up</option>
+                  <option value="re-engagement">Re-engagement</option>
+                  <option value="notification">Notification</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </FormField>
             </div>
 
-            <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-xl)' }}>
+            <FormField id="input-template-subject" label="Subject Line * (Supports dynamic tokens)" required>
+              <input
+                type="text"
+                placeholder="e.g. Partnership Opportunity — {{product_category}} for {{company}}"
+                value={form.subject}
+                onChange={(e) => updateField('subject', e.target.value)}
+              />
+            </FormField>
+
+            <FormField id="textarea-template-body" label="Email Body * (HTML Supported)" required>
+              <textarea
+                placeholder="<p>Dear {{first_name}},</p>..."
+                value={form.body}
+                onChange={(e) => handleBodyChange(e.target.value)}
+                style={{ minHeight: '260px', fontFamily: 'monospace', fontSize: 'var(--font-size-xs)' }}
+              />
+            </FormField>
+
+            {detectedVariables.length > 0 && (
+              <div>
+                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>Detected Merge Variables:</span>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  {detectedVariables.map((v) => (
+                    <span key={v} style={{ fontSize: '9px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', color: 'var(--accent-blue)' }}>
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Live Rendered Preview */}
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <span className="form-label">Live Preview (Demo Client Mode)</span>
+            <div className="card" style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border-strong)', padding: 'var(--space-md)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 'var(--space-sm)', marginBottom: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
+                <div><strong>To:</strong> Alexander Hamilton &lt;a.hamilton@treasury-imports.gov&gt;</div>
+                <div style={{ marginTop: '4px' }}><strong>Subject:</strong> {previewSubject || '(Empty Subject)'}</div>
+              </div>
               
-              {/* Left Column: Form Controls */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                {!editingId && (
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="select-preset-loader">Load from System Presets</label>
-                    <select
-                      id="select-preset-loader"
-                      className="form-select"
-                      onChange={(e) => handleLoadPreset(e.target.value)}
-                      defaultValue=""
-                    >
-                      <option value="">-- Click to Load Preset --</option>
-                      {EMAIL_TEMPLATE_PRESETS.map((p, idx) => (
-                        <option key={idx} value={idx}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="form-row">
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" htmlFor="input-template-name">Template Name *</label>
-                    <input
-                      id="input-template-name"
-                      className="form-input"
-                      type="text"
-                      placeholder="e.g. Intro Pitch - Food Products"
-                      value={form.name}
-                      onChange={(e) => updateField('name', e.target.value)}
-                    />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" htmlFor="select-template-category">Category</label>
-                    <select
-                      id="select-template-category"
-                      className="form-select"
-                      value={form.category}
-                      onChange={(e) => updateField('category', e.target.value as TemplateCategory)}
-                    >
-                      <option value="introduction">Introduction / Cold Outreach</option>
-                      <option value="catalog">Product Catalog</option>
-                      <option value="quotation">Quotation / Follow Up</option>
-                      <option value="follow-up">Follow Up</option>
-                      <option value="re-engagement">Re-engagement</option>
-                      <option value="notification">Notification</option>
-                      <option value="custom">Custom</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-template-subject">Subject Line * (Supports dynamic tokens)</label>
-                  <input
-                    id="input-template-subject"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. Partnership Opportunity — {{product_category}} for {{company}}"
-                    value={form.subject}
-                    onChange={(e) => updateField('subject', e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="textarea-template-body">Email Body * (HTML Supported)</label>
-                  <textarea
-                    id="textarea-template-body"
-                    className="form-textarea"
-                    placeholder="<p>Dear {{first_name}},</p>..."
-                    value={form.body}
-                    onChange={(e) => handleBodyChange(e.target.value)}
-                    style={{ minHeight: '260px', fontFamily: 'monospace', fontSize: 'var(--font-size-xs)' }}
-                  />
-                </div>
-
-                {detectedVariables.length > 0 && (
-                  <div>
-                    <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 'var(--font-weight-medium)', color: 'var(--text-secondary)' }}>Detected Merge Variables:</span>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                      {detectedVariables.map((v) => (
-                        <span key={v} style={{ fontSize: '9px', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', color: 'var(--accent-blue)' }}>
-                          {v}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Right Column: Live Rendered Preview */}
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <span className="form-label">Live Preview (Demo Client Mode)</span>
-                <div className="card" style={{ flex: 1, background: 'var(--bg-secondary)', border: '1px solid var(--border-strong)', padding: 'var(--space-md)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-                  <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 'var(--space-sm)', marginBottom: 'var(--space-md)', fontSize: 'var(--font-size-sm)' }}>
-                    <div><strong>To:</strong> Alexander Hamilton &lt;a.hamilton@treasury-imports.gov&gt;</div>
-                    <div style={{ marginTop: '4px' }}><strong>Subject:</strong> {previewSubject || '(Empty Subject)'}</div>
-                  </div>
-                  
-                  {/* Body Preview */}
-                  <div
-                    style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.6', flex: 1, whiteSpace: 'normal', color: 'var(--text-primary)' }}
-                    dangerouslySetInnerHTML={{ __html: previewBody || '<p style="color: var(--text-tertiary)">Write email body on the left to show preview.</p>' }}
-                  />
-                </div>
-              </div>
-
-            </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-template" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-template"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.name.trim() || !form.subject.trim() || !form.body.trim()}
-              >
-                {editingId ? 'Update Template' : 'Save Template'}
-              </button>
+              {/* Body Preview */}
+              <div
+                style={{ fontSize: 'var(--font-size-sm)', lineHeight: '1.6', flex: 1, whiteSpace: 'normal', color: 'var(--text-primary)' }}
+                dangerouslySetInnerHTML={{ __html: previewBody || '<p style="color: var(--text-tertiary)">Write email body on the left to show preview.</p>' }}
+              />
             </div>
           </div>
+
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

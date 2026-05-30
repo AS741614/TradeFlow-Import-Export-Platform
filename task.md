@@ -1,40 +1,46 @@
-# Task Checklist - Prompt 12: Tier 2 Important Fixes
+# Task Checklist - Phase 15B: Refactor Forms and Tables to Design System Primitives
 
-## 1. Currency Enum & Shared Validations
-- [x] Create `src/lib/db/validation/_shared.ts` defining ISO_4217_CODES and `currencyEnumSchema`.
-- [x] Create `src/lib/__tests__/_shared-validation.test.ts` to test currency validations.
-- [x] Integrate `currencyEnumSchema` in:
-  - `src/lib/db/validation/invoices.ts`
-  - `src/lib/db/validation/products.ts`
-  - `src/lib/db/validation/cost-items.ts`
-  - `src/lib/db/validation/financial-projections.ts`
+## 1. UI Primitives Creation
+- [x] Create UI primitives under `src/components/ui/`
+  - [x] `FormField.tsx` (generic input wrapper)
+  - [x] `FormSection.tsx` (input grouping section)
+  - [x] `DataTable.tsx` (generic typed data table)
+  - [x] `TableActions.tsx` (bulk action drawer)
+  - [x] `Modal.tsx` (native focus-trapped overlay)
+  - [x] `ConfirmDialog.tsx` (native confirm popup)
 
-## 2. Tightened String Validations
-- [x] Add `.max(255)` string caps and description/long-text caps to all 14 schema validators.
+## 2. Primitive Unit Tests
+- [x] Create Unit Tests for Primitives under `src/components/ui/__tests__/`
+  - [x] `FormField.test.tsx`
+  - [x] `FormSection.test.tsx`
+  - [x] `DataTable.test.tsx`
+  - [x] `TableActions.test.tsx`
+  - [x] `Modal.test.tsx`
+  - [x] `ConfirmDialog.test.tsx`
 
-## 3. Invoice Arithmetic Validation
-- [x] Add subtotal + tax === total refinement to `insertInvoiceSchema` and `updateInvoiceSchema` in `src/lib/db/validation/invoices.ts`.
+## 3. Operations & Outreach Contacts Refactor
+- [x] Refactor Operations Contacts (`src/app/operations/contacts/page.tsx`)
+- [x] Refactor Outreach Contacts (`src/app/outreach/contacts/page.tsx`)
 
-## 4. Query Engine N+1 Fixes & Custom Logger
-- [x] Add built-in query count logging under test environments in `src/lib/db/client.ts`.
-- [x] Refactor `getInvoices` in `src/lib/db/queries/invoices.ts` to use a single subquery join query.
-- [x] Refactor `getShipments` in `src/lib/db/queries/shipments.ts` to use a single subquery join query.
-- [x] Implement/verify N+1 query regression test verifying query count <= 2.
+## 4. Main Operational Modules Refactor
+- [x] Refactor Compliance Tracking (`src/app/operations/compliance/page.tsx`)
+- [x] Refactor Inventory Catalog (`src/app/operations/inventory/page.tsx`)
+- [x] Refactor Billing & Invoices (`src/app/operations/invoices/page.tsx`)
+- [x] Refactor Shipments Logistics (`src/app/operations/shipments/page.tsx`)
 
-## 5. API Endpoints Pagination & Consistency
-- [x] Implement limit/offset query parameters parsing and separate count queries in all 13 entity GET list routes.
-- [x] Preserve backward-compatibility by ensuring the `data` array exists at the same place.
-- [x] Wrap `POST /api/email/send` response in `{ data: ... }` envelope.
+## 5. Outreach & Campaigns Refactor
+- [x] Refactor Email Campaigns (`src/app/outreach/campaigns/page.tsx`)
+- [x] Refactor Email Templates (`src/app/outreach/templates/page.tsx`)
 
-## 6. Contacts Email Index Migration
-- [x] Add index on `contacts.email` in `src/lib/db/schema/operations.ts`.
-- [x] Run `npx drizzle-kit generate` to scaffold migration.
-- [x] Review scaffolded migration SQL.
-- [x] Run `npx drizzle-kit migrate` (or push) after confirming SQL is correct.
+## 6. Finance & Kanban Board Refactor
+- [x] Refactor Finance Overview (`src/app/finance/page.tsx`)
+- [x] Refactor Projections Dashboard (`src/app/finance/projections/page.tsx`)
+- [x] Refactor Margins Calculator (`src/app/finance/margins/page.tsx`)
+- [x] Refactor Kanban Projects Board (`src/app/projects/page.tsx`)
 
-## 7. Documentation & Verification Gate
-- [x] Document changes in `README.md`.
-- [x] Verify Types: `npx tsc --noEmit`
-- [x] Lint Checks: `npm run lint`
-- [x] Unit & Integration Tests: `npm test`
-- [x] Production Build: `npm run build`
+## 7. Verification Gate
+- [x] Type check: `npx tsc --noEmit`
+- [x] Lint checks: `npm run lint`
+- [x] Unit & Integration tests (run 3 times): `npm test`
+- [x] Production build: `npm run build`
+- [x] Conventional Commit & push

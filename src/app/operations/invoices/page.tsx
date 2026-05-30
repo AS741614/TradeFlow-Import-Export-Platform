@@ -8,6 +8,9 @@ import type { Invoice, InvoiceStatus, Contact, LineItem } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const EMPTY_LINE_ITEM = {
   description: '',
@@ -198,6 +201,101 @@ export default function InvoicesPage() {
 
   const { subtotal: activeSubtotal, tax: activeTax, total: activeTotal } = calculateTotals(form.lineItems, form.taxRate);
 
+  const columns: Column<Invoice>[] = [
+    {
+      key: 'number',
+      header: 'Invoice Number',
+      cellClassName: 'font-semibold',
+    },
+    {
+      key: 'contactName',
+      header: 'Contact / Company',
+    },
+    {
+      key: 'total',
+      header: 'Amount',
+      render: (invoice) => formatCurrency(invoice.total, invoice.currency),
+    },
+    {
+      key: 'issuedDate',
+      header: 'Issued',
+      render: (invoice) => formatDate(invoice.issuedDate),
+    },
+    {
+      key: 'dueDate',
+      header: 'Due Date',
+      render: (invoice) => formatDate(invoice.dueDate),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (invoice) => (
+        <span className={`badge ${getStatusColor(invoice.status === 'paid' ? 'success' : invoice.status === 'sent' ? 'info' : invoice.status === 'overdue' ? 'danger' : 'neutral')}`}>
+          {invoice.status}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (invoice) => (
+        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+          <button
+            id={`btn-edit-invoice-${invoice.id}`}
+            className="btn btn-ghost btn-sm btn-icon"
+            onClick={() => openEdit(invoice)}
+            title="Edit"
+          >
+            <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+          <button
+            id={`btn-delete-invoice-${invoice.id}`}
+            className="btn btn-danger btn-sm btn-icon"
+            onClick={() => { void handleDelete(invoice.id); }}
+            title="Delete"
+          >
+            <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const itemColumns: Column<LineItem>[] = [
+    {
+      key: 'description',
+      header: 'Description',
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+    },
+    {
+      key: 'unitPrice',
+      header: 'Unit Price',
+      render: (item) => formatCurrency(item.unitPrice, form.currency),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      render: (item) => formatCurrency(item.total, form.currency),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (item) => (
+        <button
+          id={`btn-remove-invoice-item-${item.id}`}
+          className="btn btn-ghost btn-sm btn-icon"
+          type="button"
+          onClick={() => handleRemoveLineItem(item.id)}
+        >
+          ✕
+        </button>
+      ),
+    },
+  ];
+
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
@@ -234,293 +332,199 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          {filtered.length > 0 ? (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Invoice Number</th>
-                  <th>Contact / Company</th>
-                  <th>Amount</th>
-                  <th>Issued</th>
-                  <th>Due Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((invoice) => (
-                  <tr key={invoice.id} className="stagger-item">
-                    <td style={{ fontWeight: 'var(--font-weight-semibold)' }}>{invoice.number}</td>
-                    <td>{invoice.contactName}</td>
-                    <td>{formatCurrency(invoice.total, invoice.currency)}</td>
-                    <td>{formatDate(invoice.issuedDate)}</td>
-                    <td>{formatDate(invoice.dueDate)}</td>
-                    <td>
-                      <span className={`badge ${getStatusColor(invoice.status === 'paid' ? 'success' : invoice.status === 'sent' ? 'info' : invoice.status === 'overdue' ? 'danger' : 'neutral')}`}>
-                        {invoice.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                        <button
-                          id={`btn-edit-invoice-${invoice.id}`}
-                          className="btn btn-ghost btn-sm btn-icon"
-                          onClick={() => openEdit(invoice)}
-                          title="Edit"
-                        >
-                          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                        </button>
-                        <button
-                          id={`btn-delete-invoice-${invoice.id}`}
-                          className="btn btn-danger btn-sm btn-icon"
-                          onClick={() => { void handleDelete(invoice.id); }}
-                          title="Delete"
-                        >
-                          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="data-table-empty">
-              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              <p>No invoices found. Create your first commercial invoice to get started.</p>
-            </div>
-          )}
+          <DataTable
+            id="invoices-table"
+            columns={columns}
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            emptyState={
+              <div className="data-table-empty">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <p>No invoices found. Create your first commercial invoice to get started.</p>
+              </div>
+            }
+          />
         </div>
       )}
 
       {/* Invoice Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={closeModal}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>{editingId ? 'Edit Invoice' : 'Create Invoice'}</h2>
-              <button id="btn-close-invoice-modal" className="btn btn-ghost btn-icon btn-sm" onClick={closeModal}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+      <Modal
+        id="invoice-modal"
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Edit Invoice' : 'Create Invoice'}
+        footer={
+          <>
+            <button id="btn-cancel-invoice" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button
+              id="btn-save-invoice"
+              className="btn btn-primary"
+              onClick={() => { void handleSubmit(); }}
+              disabled={!form.number.trim() || !form.contactId || form.lineItems.length === 0}
+            >
+              {editingId ? 'Update Invoice' : 'Create Invoice'}
+            </button>
+          </>
+        }
+      >
+        <div className="form-row">
+          <FormField id="input-invoice-number" label="Invoice Number" required>
+            <input
+              type="text"
+              placeholder="e.g. INV-2026-001"
+              value={form.number}
+              onChange={(e) => updateField('number', e.target.value)}
+            />
+          </FormField>
+          <FormField id="select-invoice-status" label="Status">
+            <select
+              value={form.status}
+              onChange={(e) => updateField('status', e.target.value as InvoiceStatus)}
+            >
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="select-invoice-contact" label="Billing Contact" required>
+            <select
+              value={form.contactId}
+              onChange={(e) => updateField('contactId', e.target.value)}
+            >
+              <option value="">-- Select Contact Company --</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>{c.company} ({c.contactPerson})</option>
+              ))}
+            </select>
+          </FormField>
+          <FormField id="select-invoice-currency" label="Currency">
+            <select
+              value={form.currency}
+              onChange={(e) => updateField('currency', e.target.value)}
+            >
+              {CURRENCIES.map((cur) => (
+                <option key={cur.code} value={cur.code}>{cur.code} — {cur.name}</option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+
+        <div className="form-row">
+          <FormField id="input-invoice-issued" label="Issue Date" required>
+            <input
+              type="date"
+              value={form.issuedDate}
+              onChange={(e) => updateField('issuedDate', e.target.value)}
+            />
+          </FormField>
+          <FormField id="input-invoice-due" label="Due Date" required>
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) => updateField('dueDate', e.target.value)}
+            />
+          </FormField>
+        </div>
+
+        {/* Line Items Section */}
+        <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
+          <h4 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }}>
+            Line Items
+          </h4>
+
+          <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap', marginBottom: 'var(--space-md)' }}>
+            <input
+              id="input-invoice-item-desc"
+              className="form-input"
+              placeholder="Description (e.g. Organic Cotton Roll)"
+              value={tempItem.description}
+              onChange={(e) => setTempItem({ ...tempItem, description: e.target.value })}
+              style={{ flex: 3 }}
+            />
+            <input
+              id="input-invoice-item-qty"
+              className="form-input"
+              type="number"
+              min={1}
+              placeholder="Qty"
+              value={tempItem.quantity || ''}
+              onChange={(e) => setTempItem({ ...tempItem, quantity: parseInt(e.target.value) || 0 })}
+              style={{ flex: 1, minWidth: 60 }}
+            />
+            <input
+              id="input-invoice-item-price"
+              className="form-input"
+              type="number"
+              min={0.01}
+              step={0.01}
+              placeholder="Price"
+              value={tempItem.unitPrice || ''}
+              onChange={(e) => setTempItem({ ...tempItem, unitPrice: parseFloat(e.target.value) || 0 })}
+              style={{ flex: 1.5, minWidth: 80 }}
+            />
+            <button
+              id="btn-add-invoice-item"
+              className="btn btn-secondary"
+              type="button"
+              onClick={handleAddLineItem}
+              disabled={!tempItem.description.trim() || tempItem.unitPrice <= 0 || tempItem.quantity <= 0}
+            >
+              Add
+            </button>
+          </div>
+
+          {form.lineItems.length > 0 ? (
+            <div style={{ background: 'var(--bg-surface)', marginBottom: 'var(--space-md)' }}>
+              <DataTable
+                id="invoice-line-items-table"
+                columns={itemColumns}
+                data={form.lineItems}
+                keyExtractor={(item) => item.id}
+                className="line-items-table"
+              />
             </div>
+          ) : (
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', textAlign: 'center', margin: 'var(--space-md) 0' }}>
+              Please add at least one line item to this invoice.
+            </p>
+          )}
 
-            <div className="modal-body">
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-invoice-number">Invoice Number *</label>
-                  <input
-                    id="input-invoice-number"
-                    className="form-input"
-                    type="text"
-                    placeholder="e.g. INV-2026-001"
-                    value={form.number}
-                    onChange={(e) => updateField('number', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-invoice-status">Status</label>
-                  <select
-                    id="select-invoice-status"
-                    className="form-select"
-                    value={form.status}
-                    onChange={(e) => updateField('status', e.target.value as InvoiceStatus)}
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
-                    <option value="paid">Paid</option>
-                    <option value="overdue">Overdue</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-invoice-contact">Billing Contact *</label>
-                  <select
-                    id="select-invoice-contact"
-                    className="form-select"
-                    value={form.contactId}
-                    onChange={(e) => updateField('contactId', e.target.value)}
-                  >
-                    <option value="">-- Select Contact Company --</option>
-                    {contacts.map((c) => (
-                      <option key={c.id} value={c.id}>{c.company} ({c.contactPerson})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="select-invoice-currency">Currency</label>
-                  <select
-                    id="select-invoice-currency"
-                    className="form-select"
-                    value={form.currency}
-                    onChange={(e) => updateField('currency', e.target.value)}
-                  >
-                    {CURRENCIES.map((cur) => (
-                      <option key={cur.code} value={cur.code}>{cur.code} — {cur.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-invoice-issued">Issue Date *</label>
-                  <input
-                    id="input-invoice-issued"
-                    className="form-input"
-                    type="date"
-                    value={form.issuedDate}
-                    onChange={(e) => updateField('issuedDate', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="input-invoice-due">Due Date *</label>
-                  <input
-                    id="input-invoice-due"
-                    className="form-input"
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) => updateField('dueDate', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Line Items Section */}
-              <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-lg)' }}>
-                <h4 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--space-sm)' }}>
-                  Line Items
-                </h4>
-
-                <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap', marginBottom: 'var(--space-md)' }}>
-                  <input
-                    id="input-invoice-item-desc"
-                    className="form-input"
-                    placeholder="Description (e.g. Organic Cotton Roll)"
-                    value={tempItem.description}
-                    onChange={(e) => setTempItem({ ...tempItem, description: e.target.value })}
-                    style={{ flex: 3 }}
-                  />
-                  <input
-                    id="input-invoice-item-qty"
-                    className="form-input"
-                    type="number"
-                    min={1}
-                    placeholder="Qty"
-                    value={tempItem.quantity || ''}
-                    onChange={(e) => setTempItem({ ...tempItem, quantity: parseInt(e.target.value) || 0 })}
-                    style={{ flex: 1, minWidth: 60 }}
-                  />
-                  <input
-                    id="input-invoice-item-price"
-                    className="form-input"
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    placeholder="Price"
-                    value={tempItem.unitPrice || ''}
-                    onChange={(e) => setTempItem({ ...tempItem, unitPrice: parseFloat(e.target.value) || 0 })}
-                    style={{ flex: 1.5, minWidth: 80 }}
-                  />
-                  <button
-                    id="btn-add-invoice-item"
-                    className="btn btn-secondary"
-                    type="button"
-                    onClick={handleAddLineItem}
-                    disabled={!tempItem.description.trim() || tempItem.unitPrice <= 0 || tempItem.quantity <= 0}
-                  >
-                    Add
-                  </button>
-                </div>
-
-                {form.lineItems.length > 0 ? (
-                  <table className="data-table" style={{ background: 'var(--bg-surface)', marginBottom: 'var(--space-md)' }}>
-                    <thead>
-                      <tr>
-                        <th>Description</th>
-                        <th>Qty</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.lineItems.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.description}</td>
-                          <td>{item.quantity}</td>
-                          <td>{formatCurrency(item.unitPrice, form.currency)}</td>
-                          <td>{formatCurrency(item.total, form.currency)}</td>
-                          <td>
-                            <button
-                              id={`btn-remove-invoice-item-${item.id}`}
-                              className="btn btn-ghost btn-sm btn-icon"
-                              type="button"
-                              onClick={() => handleRemoveLineItem(item.id)}
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', textAlign: 'center', margin: 'var(--space-md) 0' }}>
-                    Please add at least one line item to this invoice.
-                  </p>
-                )}
-
-                {/* Totals Summary */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 'var(--space-xs)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-sm)' }}>
-                  <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                    Subtotal: <strong>{formatCurrency(activeSubtotal, form.currency)}</strong>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', fontSize: 'var(--font-size-sm)' }}>
-                    <span>Tax Rate (%):</span>
-                    <input
-                      id="input-invoice-tax-rate"
-                      className="form-input"
-                      type="number"
-                      min={0}
-                      value={form.taxRate}
-                      onChange={(e) => updateField('taxRate', parseFloat(e.target.value) || 0)}
-                      style={{ width: 70, height: 30, padding: '4px' }}
-                    />
-                    <span>Tax: {formatCurrency(activeTax, form.currency)}</span>
-                  </div>
-                  <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--accent-blue)', marginTop: '4px' }}>
-                    Total: {formatCurrency(activeTotal, form.currency)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: 'var(--space-md)' }}>
-                <label className="form-label" htmlFor="textarea-invoice-notes">Notes</label>
-                <textarea
-                  id="textarea-invoice-notes"
-                  className="form-textarea"
-                  placeholder="Wire instructions, payment conditions, Incoterm details..."
-                  value={form.notes}
-                  onChange={(e) => updateField('notes', e.target.value)}
-                />
-              </div>
+          {/* Totals Summary */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 'var(--space-xs)', borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-sm)' }}>
+            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+              Subtotal: <strong>{formatCurrency(activeSubtotal, form.currency)}</strong>
             </div>
-
-            <div className="modal-footer">
-              <button id="btn-cancel-invoice" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-              <button
-                id="btn-save-invoice"
-                className="btn btn-primary"
-                onClick={() => { void handleSubmit(); }}
-                disabled={!form.number.trim() || !form.contactId || form.lineItems.length === 0}
-              >
-                {editingId ? 'Update Invoice' : 'Create Invoice'}
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', fontSize: 'var(--font-size-sm)' }}>
+              <span>Tax Rate (%):</span>
+              <input
+                id="input-invoice-tax-rate"
+                className="form-input"
+                type="number"
+                min={0}
+                value={form.taxRate}
+                onChange={(e) => updateField('taxRate', parseFloat(e.target.value) || 0)}
+                style={{ width: 70, height: 30, padding: '4px' }}
+              />
+              <span>Tax: {formatCurrency(activeTax, form.currency)}</span>
+            </div>
+            <div style={{ fontSize: 'var(--font-size-md)', fontWeight: 'var(--font-weight-bold)', color: 'var(--accent-blue)', marginTop: '4px' }}>
+              Total: {formatCurrency(activeTotal, form.currency)}
             </div>
           </div>
         </div>
-      )}
+
+        <FormField id="textarea-invoice-notes" label="Notes" containerClassName="invoice-notes-field">
+          <textarea
+            placeholder="Wire instructions, payment conditions, Incoterm details..."
+            value={form.notes}
+            onChange={(e) => updateField('notes', e.target.value)}
+          />
+        </FormField>
+      </Modal>
     </div>
   );
 }

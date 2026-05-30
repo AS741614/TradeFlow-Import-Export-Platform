@@ -7,6 +7,8 @@ import type { FinancialProjection } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { FormField } from '@/components/ui/FormField';
 
 // ---- Month labels for dropdown ----
 const MONTHS = [
@@ -20,6 +22,66 @@ export default function ProjectionsPage() {
   const [projections, setProjections] = useState<FinancialProjection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const columns: Column<FinancialProjection>[] = [
+    {
+      key: 'month',
+      header: 'Month',
+      render: (p) => <span style={{ fontWeight: 'var(--font-weight-medium)' }}>{p.month}</span>,
+    },
+    {
+      key: 'revenue',
+      header: 'Revenue',
+      render: (p) => <span style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(p.revenue)}</span>,
+    },
+    {
+      key: 'expenses',
+      header: 'Expenses',
+      render: (p) => <span style={{ color: 'var(--accent-red)' }}>{formatCurrency(p.expenses)}</span>,
+    },
+    {
+      key: 'profit',
+      header: 'Profit',
+      render: (p) => (
+        <span
+          style={{
+            fontWeight: 'var(--font-weight-semibold)',
+            color: p.profit >= 0 ? 'var(--accent-emerald)' : 'var(--accent-red)',
+          }}
+        >
+          {formatCurrency(p.profit)}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (p) => (
+        <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+          <button
+            id={`proj-edit-${p.id}`}
+            className="btn btn-ghost btn-sm"
+            onClick={() => handleEdit(p)}
+          >
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+          <button
+            id={`proj-delete-${p.id}`}
+            className="btn btn-danger btn-sm"
+            onClick={() => { void handleDelete(p.id); }}
+          >
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+            </svg>
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -211,8 +273,7 @@ export default function ProjectionsPage() {
           {editingId ? 'Edit Projection' : 'Add Monthly Projection'}
         </h3>
         <div className="form-row" style={{ alignItems: 'flex-end' }}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="proj-month">Month</label>
+          <FormField id="proj-month" label="Month">
             <select
               id="proj-month"
               className="form-select"
@@ -230,9 +291,8 @@ export default function ProjectionsPage() {
                 </option>
               ))}
             </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="proj-revenue">Revenue ($)</label>
+          </FormField>
+          <FormField id="proj-revenue" label="Revenue ($)">
             <input
               id="proj-revenue"
               type="number"
@@ -243,9 +303,8 @@ export default function ProjectionsPage() {
               value={formRevenue}
               onChange={(e) => setFormRevenue(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="form-label" htmlFor="proj-expenses">Expenses ($)</label>
+          </FormField>
+          <FormField id="proj-expenses" label="Expenses ($)">
             <input
               id="proj-expenses"
               type="number"
@@ -256,7 +315,7 @@ export default function ProjectionsPage() {
               value={formExpenses}
               onChange={(e) => setFormExpenses(e.target.value)}
             />
-          </div>
+          </FormField>
           <div className="form-group" style={{ display: 'flex', gap: 'var(--space-sm)' }}>
             <button id="proj-save-btn" className="btn btn-primary" onClick={() => { void handleSave(); }}>
               {editingId ? 'Update' : 'Add'}
@@ -276,67 +335,20 @@ export default function ProjectionsPage() {
           <h3>Monthly Projections</h3>
           <span className="text-sm text-secondary">{projections.length} months</span>
         </div>
-        {projections.length > 0 ? (
-          <table className="data-table" id="proj-data-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Revenue</th>
-                <th>Expenses</th>
-                <th>Profit</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projections.map((p) => (
-                <tr key={p.id} className="stagger-item">
-                  <td style={{ fontWeight: 'var(--font-weight-medium)' }}>{p.month}</td>
-                  <td style={{ color: 'var(--accent-emerald)' }}>{formatCurrency(p.revenue)}</td>
-                  <td style={{ color: 'var(--accent-red)' }}>{formatCurrency(p.expenses)}</td>
-                  <td
-                    style={{
-                      fontWeight: 'var(--font-weight-semibold)',
-                      color: p.profit >= 0 ? 'var(--accent-emerald)' : 'var(--accent-red)',
-                    }}
-                  >
-                    {formatCurrency(p.profit)}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
-                      <button
-                        id={`proj-edit-${p.id}`}
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => handleEdit(p)}
-                      >
-                        <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
-                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                      <button
-                        id={`proj-delete-${p.id}`}
-                        className="btn btn-danger btn-sm"
-                        onClick={() => { void handleDelete(p.id); }}
-                      >
-                        <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
-                          <polyline points="3 6 5 6 21 6" />
-                          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="data-table-empty">
-            <svg viewBox="0 0 24 24">
-              <path d="M18 20V10M12 20V4M6 20v-6" />
-            </svg>
-            <p>No projections yet. Add your first month above.</p>
-          </div>
-        )}
+        <DataTable
+          id="proj-data-table"
+          columns={columns}
+          data={projections}
+          keyExtractor={(p) => p.id}
+          emptyState={
+            <div className="data-table-empty">
+              <svg viewBox="0 0 24 24">
+                <path d="M18 20V10M12 20V4M6 20v-6" />
+              </svg>
+              <p>No projections yet. Add your first month above.</p>
+            </div>
+          }
+        />
       </div>
 
       {/* Bar Chart Visualization */}

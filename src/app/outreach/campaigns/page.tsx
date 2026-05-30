@@ -8,6 +8,9 @@ import type { Campaign, EmailTemplate, OutreachContact } from '@/lib/types';
 import { StorageError } from '@/lib/api-client';
 import Loading from '@/components/Loading';
 import ErrorBanner from '@/components/ErrorBanner';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Modal } from '@/components/ui/Modal';
+import { FormField } from '@/components/ui/FormField';
 
 const INITIAL_WIZARD = {
   step: 1,
@@ -219,6 +222,22 @@ export default function CampaignsPage() {
 
 
 
+  const contactColumns: Column<OutreachContact>[] = [
+    {
+      key: 'company',
+      header: 'Company / Target',
+      render: (c) => (
+        <>
+          <strong>{c.company}</strong> ({c.firstName})
+        </>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'Email',
+    },
+  ];
+
   if (loading) return <Loading />;
 
   return (
@@ -328,217 +347,170 @@ export default function CampaignsPage() {
       </div>
 
       {/* Campaign Creation Multi-Step Wizard Modal */}
-      {showWizard && (
-        <div className="modal-overlay" onClick={closeWizard}>
-          <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>New Campaign Wizard (Step {wizard.step} of 5)</h2>
-              <button id="btn-close-wizard" className="btn btn-ghost btn-icon btn-sm" onClick={closeWizard}>
-                <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-              </button>
+      <Modal
+        id="wizard-modal"
+        isOpen={showWizard}
+        onClose={closeWizard}
+        title={`New Campaign Wizard (Step ${String(wizard.step)} of 5)`}
+        footer={
+          <>
+            {wizard.step > 1 && (
+              <button id="btn-wizard-prev" className="btn btn-secondary" onClick={prevStep}>Back</button>
+            )}
+            {wizard.step < 5 ? (
+              <button id="btn-wizard-next" className="btn btn-primary" onClick={nextStep}>Next</button>
+            ) : (
+              <button id="btn-wizard-launch" className="btn btn-primary" onClick={() => { void handleLaunchCampaign(); }}>Launch Campaign</button>
+            )}
+          </>
+        }
+      >
+        {/* STEP 1: Campaign Metadata */}
+        {wizard.step === 1 && (
+          <div className="animate-fade-in">
+            <FormField id="input-wizard-name" label="Campaign Name" required>
+              <input
+                type="text"
+                placeholder="e.g. EU Textile Buyers Launch"
+                value={wizard.name}
+                onChange={(e) => setWizard({ ...wizard, name: e.target.value })}
+              />
+            </FormField>
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>
+              Choose a descriptive name to organize your outreach analytics (e.g. including product or market sector).
+            </p>
+          </div>
+        )}
+
+        {/* STEP 2: Template Selection */}
+        {wizard.step === 2 && (
+          <div className="animate-fade-in">
+            <FormField id="select-wizard-template" label="Select Email Template" required>
+              <select
+                value={wizard.templateId}
+                onChange={(e) => setWizard({ ...wizard, templateId: e.target.value })}
+              >
+                <option value="">-- Choose template --</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name} (Tokens: {t.variables.length})</option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+        )}
+
+        {/* STEP 3: Contacts Selection */}
+        {wizard.step === 3 && (
+          <div className="animate-fade-in">
+            <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+              <input
+                id="input-wizard-contacts-search"
+                className="form-input"
+                placeholder="Search targets..."
+                value={contactSearch}
+                onChange={(e) => setContactSearch(e.target.value)}
+                style={{ flex: 2 }}
+              />
+              <select
+                id="select-wizard-tag-filter"
+                className="form-select"
+                value={contactTagFilter}
+                onChange={(e) => setContactTagFilter(e.target.value)}
+                style={{ flex: 1 }}
+              >
+                <option value="all">All Tags</option>
+                {allContactTags.map((tag) => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="modal-body">
-              
-              {/* STEP 1: Campaign Metadata */}
-              {wizard.step === 1 && (
-                <div className="animate-fade-in">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="input-wizard-name">Campaign Name *</label>
-                    <input
-                      id="input-wizard-name"
-                      className="form-input"
-                      type="text"
-                      placeholder="e.g. EU Textile Buyers Launch"
-                      value={wizard.name}
-                      onChange={(e) => setWizard({ ...wizard, name: e.target.value })}
-                    />
-                  </div>
-                  <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                    Choose a descriptive name to organize your outreach analytics (e.g. including product or market sector).
-                  </p>
-                </div>
-              )}
-
-              {/* STEP 2: Template Selection */}
-              {wizard.step === 2 && (
-                <div className="animate-fade-in">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="select-wizard-template">Select Email Template *</label>
-                    <select
-                      id="select-wizard-template"
-                      className="form-select"
-                      value={wizard.templateId}
-                      onChange={(e) => setWizard({ ...wizard, templateId: e.target.value })}
-                    >
-                      <option value="">-- Choose template --</option>
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name} (Tokens: {t.variables.length})</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 3: Contacts Selection */}
-              {wizard.step === 3 && (
-                <div className="animate-fade-in">
-                  <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-                    <input
-                      id="input-wizard-contacts-search"
-                      className="form-input"
-                      placeholder="Search targets..."
-                      value={contactSearch}
-                      onChange={(e) => setContactSearch(e.target.value)}
-                      style={{ flex: 2 }}
-                    />
-                    <select
-                      id="select-wizard-tag-filter"
-                      className="form-select"
-                      value={contactTagFilter}
-                      onChange={(e) => setContactTagFilter(e.target.value)}
-                      style={{ flex: 1 }}
-                    >
-                      <option value="all">All Tags</option>
-                      {allContactTags.map((tag) => (
-                        <option key={tag} value={tag}>{tag}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="data-table-wrapper" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th style={{ width: 40 }}>
-                            <input
-                              id="checkbox-wizard-select-all"
-                              type="checkbox"
-                              checked={filteredWizardContacts.length > 0 && filteredWizardContacts.every((c) => wizard.contactIds.includes(c.id))}
-                              onChange={(e) => handleSelectAllWizardContacts(e.target.checked)}
-                            />
-                          </th>
-                          <th>Company / Target</th>
-                          <th>Email</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredWizardContacts.map((c) => (
-                          <tr key={c.id}>
-                            <td>
-                              <input
-                                id={`checkbox-wizard-select-${c.id}`}
-                                type="checkbox"
-                                checked={wizard.contactIds.includes(c.id)}
-                                onChange={(e) => handleToggleContact(c.id, e.target.checked)}
-                              />
-                            </td>
-                            <td><strong>{c.company}</strong> ({c.firstName})</td>
-                            <td>{c.email}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style={{ marginTop: 'var(--space-sm)', fontSize: 'var(--font-size-xs)', textAlign: 'right', fontWeight: 'var(--font-weight-medium)' }}>
-                    Selected Contacts: {wizard.contactIds.length}
-                  </div>
-                </div>
-              )}
-
-              {/* STEP 4: Sending Cadence Settings */}
-              {wizard.step === 4 && (
-                <div className="animate-fade-in">
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="select-wizard-send-type">Sending Strategy</label>
-                    <select
-                      id="select-wizard-send-type"
-                      className="form-select"
-                      value={wizard.scheduleType}
-                      onChange={(e) => setWizard({ ...wizard, scheduleType: e.target.value as 'immediate' | 'scheduled' | 'drip' })}
-                    >
-                      <option value="immediate">Send Immediately (Demo Mode Runs Instantly)</option>
-                      <option value="scheduled">Schedule Date (Cron-Based Delayed delivery)</option>
-                      <option value="drip">Drip Delivery Array (Throttled rate)</option>
-                    </select>
-                  </div>
-
-                  {wizard.scheduleType === 'scheduled' && (
-                    <div className="form-group animate-slide-down">
-                      <label className="form-label" htmlFor="input-wizard-schedule-date">Scheduled Start Date *</label>
-                      <input
-                        id="input-wizard-schedule-date"
-                        className="form-input"
-                        type="date"
-                        value={wizard.scheduledAt}
-                        onChange={(e) => setWizard({ ...wizard, scheduledAt: e.target.value })}
-                      />
-                    </div>
-                  )}
-
-                  {wizard.scheduleType === 'drip' && (
-                    <div className="form-group animate-slide-down">
-                      <label className="form-label" htmlFor="input-wizard-drip-rate">Sends Per Hour</label>
-                      <input
-                        id="input-wizard-drip-rate"
-                        className="form-input"
-                        type="number"
-                        min={1}
-                        value={wizard.sendsPerHour}
-                        onChange={(e) => setWizard({ ...wizard, sendsPerHour: parseInt(e.target.value) || 50 })}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* STEP 5: Final Review */}
-              {wizard.step === 5 && (
-                <div className="animate-fade-in">
-                  <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--accent-blue)', marginBottom: 'var(--space-md)' }}>
-                    Confirm Campaign Configuration
-                  </h3>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', background: 'var(--bg-secondary)', padding: 'var(--space-lg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Campaign Name:</span>
-                      <strong style={{ display: 'block', color: 'var(--text-primary)' }}>{wizard.name}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Template:</span>
-                      <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
-                        {templates.find((t) => t.id === wizard.templateId)?.name}
-                      </strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Recipient Count:</span>
-                      <strong style={{ display: 'block', color: 'var(--text-primary)' }}>{wizard.contactIds.length} targets</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: 'var(--text-tertiary)' }}>Schedule Settings:</span>
-                      <strong style={{ display: 'block', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
-                        {wizard.scheduleType} {wizard.scheduleType === 'scheduled' ? `on ${wizard.scheduledAt}` : ''} {wizard.scheduleType === 'drip' ? `at ${String(wizard.sendsPerHour)} emails/hr` : ''}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>
+              <DataTable
+                id="wizard-contacts-table"
+                columns={contactColumns}
+                data={filteredWizardContacts}
+                keyExtractor={(item) => item.id}
+                selectedIds={wizard.contactIds}
+                onSelectChange={handleToggleContact}
+                onSelectAllChange={handleSelectAllWizardContacts}
+              />
             </div>
-
-            <div className="modal-footer">
-              {wizard.step > 1 && (
-                <button id="btn-wizard-prev" className="btn btn-secondary" onClick={prevStep}>Back</button>
-              )}
-              {wizard.step < 5 ? (
-                <button id="btn-wizard-next" className="btn btn-primary" onClick={nextStep}>Next</button>
-              ) : (
-                <button id="btn-wizard-launch" className="btn btn-primary" onClick={() => { void handleLaunchCampaign(); }}>Launch Campaign</button>
-              )}
+            <div style={{ marginTop: 'var(--space-sm)', fontSize: 'var(--font-size-xs)', textAlign: 'right', fontWeight: 'var(--font-weight-medium)' }}>
+              Selected Contacts: {wizard.contactIds.length}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* STEP 4: Sending Cadence Settings */}
+        {wizard.step === 4 && (
+          <div className="animate-fade-in">
+            <FormField id="select-wizard-send-type" label="Sending Strategy">
+              <select
+                value={wizard.scheduleType}
+                onChange={(e) => setWizard({ ...wizard, scheduleType: e.target.value as 'immediate' | 'scheduled' | 'drip' })}
+              >
+                <option value="immediate">Send Immediately (Demo Mode Runs Instantly)</option>
+                <option value="scheduled">Schedule Date (Cron-Based Delayed delivery)</option>
+                <option value="drip">Drip Delivery Array (Throttled rate)</option>
+              </select>
+            </FormField>
+
+            {wizard.scheduleType === 'scheduled' && (
+              <FormField id="input-wizard-schedule-date" label="Scheduled Start Date" containerClassName="animate-slide-down" required>
+                <input
+                  type="date"
+                  value={wizard.scheduledAt}
+                  onChange={(e) => setWizard({ ...wizard, scheduledAt: e.target.value })}
+                />
+              </FormField>
+            )}
+
+            {wizard.scheduleType === 'drip' && (
+              <FormField id="input-wizard-drip-rate" label="Sends Per Hour" containerClassName="animate-slide-down">
+                <input
+                  type="number"
+                  min={1}
+                  value={wizard.sendsPerHour}
+                  onChange={(e) => setWizard({ ...wizard, sendsPerHour: parseInt(e.target.value) || 50 })}
+                />
+              </FormField>
+            )}
+          </div>
+        )}
+
+        {/* STEP 5: Final Review */}
+        {wizard.step === 5 && (
+          <div className="animate-fade-in">
+            <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', color: 'var(--accent-blue)', marginBottom: 'var(--space-md)' }}>
+              Confirm Campaign Configuration
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', background: 'var(--bg-secondary)', padding: 'var(--space-lg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div>
+                <span style={{ color: 'var(--text-tertiary)' }}>Campaign Name:</span>
+                <strong style={{ display: 'block', color: 'var(--text-primary)' }}>{wizard.name}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-tertiary)' }}>Template:</span>
+                <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
+                  {templates.find((t) => t.id === wizard.templateId)?.name}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-tertiary)' }}>Recipient Count:</span>
+                <strong style={{ display: 'block', color: 'var(--text-primary)' }}>{wizard.contactIds.length} targets</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-tertiary)' }}>Schedule Settings:</span>
+                <strong style={{ display: 'block', color: 'var(--text-primary)', textTransform: 'capitalize' }}>
+                  {wizard.scheduleType} {wizard.scheduleType === 'scheduled' ? `on ${wizard.scheduledAt}` : ''} {wizard.scheduleType === 'drip' ? `at ${String(wizard.sendsPerHour)} emails/hr` : ''}
+                </strong>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
